@@ -1,5 +1,4 @@
 import AppKit
-import ServiceManagement
 import FlingKit
 
 @MainActor
@@ -20,8 +19,8 @@ struct ContextMenuBuilder {
         menu.addItem(action("Cast clipboard URL") { Task { await state.castClipboard() } })
         menu.addItem(.separator())
 
-        if case .ambiguous(let options) = state.sourceChoice {
-            menu.addItem(submenu("Source", items: options.map { browser in
+        if state.installedBrowsers.count > 1 {
+            menu.addItem(submenu("Source", items: state.installedBrowsers.map { browser in
                 action(browser.displayName) { Task { await state.select(browser: browser) } }
             }))
         }
@@ -52,8 +51,8 @@ struct ContextMenuBuilder {
                             enabled: casting) { Task { await state.stopCasting() } })
         menu.addItem(.separator())
 
-        let login = action("Open at Login") { toggleLoginItem() }
-        login.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        let login = action("Open at Login") { LoginItem.toggle() }
+        login.state = LoginItem.isEnabled ? .on : .off
         menu.addItem(login)
 
         menu.addItem(action("Quit Fling", key: "q", modifiers: [.command]) {
@@ -87,17 +86,6 @@ struct ContextMenuBuilder {
         return parent
     }
 
-    private func toggleLoginItem() {
-        do {
-            if SMAppService.mainApp.status == .enabled {
-                try SMAppService.mainApp.unregister()
-            } else {
-                try SMAppService.mainApp.register()
-            }
-        } catch {
-            NSLog("Fling: login item toggle failed — \(error.localizedDescription)")
-        }
-    }
 }
 
 /// `NSMenuItem` needs an ObjC target; this carries a Swift closure to one.

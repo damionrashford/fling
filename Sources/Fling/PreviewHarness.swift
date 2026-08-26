@@ -21,6 +21,7 @@ enum PreviewHarness {
                              browsers: BrowserReader(runner: StubRunner()))
         state.devices = [DeviceInfo(ip: "192.168.1.42", name: "Living room TV", model: "TCL Smart TV")]
         state.selectedDevice = state.devices.first
+        state.activeBrowser = .chrome
         configure(state)
         return state
     }
@@ -31,7 +32,7 @@ enum PreviewHarness {
         app.setActivationPolicy(.regular)
 
         let idleCastable = makeState {
-            $0.apply(tab: TabRef(url: "https://www.youtube.com/watch?v=x",
+            $0.apply(tab: TabRef(url: "https://www.youtube.com/watch?v=gCcx85zbxz4",
                                  title: "Big Buck Bunny — Official Trailer",
                                  browser: .chrome),
                      status: CastStatus(title: nil, elapsed: nil, duration: nil,
@@ -45,14 +46,14 @@ enum PreviewHarness {
         }
         let ambiguous = makeState {
             $0.sourceChoice = .ambiguous([.chrome, .safari])
-            $0.apply(tab: TabRef(url: "https://www.youtube.com/watch?v=x",
+            $0.apply(tab: TabRef(url: "https://www.youtube.com/watch?v=gCcx85zbxz4",
                                  title: "Blade Runner 2049 — Official Trailer",
                                  browser: .chrome),
                      status: CastStatus(title: nil, elapsed: nil, duration: nil,
                                         volume: 64, muted: false))
         }
         let casting = makeState {
-            $0.apply(tab: TabRef(url: "https://www.youtube.com/watch?v=x",
+            $0.apply(tab: TabRef(url: "https://www.youtube.com/watch?v=gCcx85zbxz4",
                                  title: "Blade Runner 2049 — Official Trailer",
                                  browser: .chrome),
                      status: CastStatus(title: "Blade Runner 2049 — Official Trailer",

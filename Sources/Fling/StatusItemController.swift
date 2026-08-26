@@ -18,8 +18,11 @@ final class StatusItemController: NSObject {
         super.init()
 
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 260, height: 320)
-        popover.contentViewController = NSHostingController(rootView: PanelView(state: state))
+        // No fixed contentSize — the panel's height varies by state (artwork,
+        // transport rows), and pinning it clipped the taller states.
+        let host = NSHostingController(rootView: PanelView(state: state))
+        host.sizingOptions = [.preferredContentSize]
+        popover.contentViewController = host
 
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "tv", accessibilityDescription: "Fling")

@@ -54,9 +54,15 @@ struct PanelView: View {
 
     private func idle(reason: String?) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Rule 1 — only when both browsers run.
-            if case .ambiguous(let options) = state.sourceChoice {
-                SourcePicker(state: state, options: options)
+            // Shown whenever both browsers are installed, so a closed browser is
+            // still reachable.
+            if state.installedBrowsers.count > 1 {
+                SourcePicker(state: state, options: state.installedBrowsers)
+            }
+
+            // Only when the URL actually yields a preview image.
+            if let thumb = state.tab?.thumbnailURL {
+                Artwork(url: thumb).padding(.top, 8)
             }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -91,7 +97,19 @@ struct PanelView: View {
             Separator()
             VolumeRow(state: state)          // Rule 2
             Separator()
+            housekeeping
             DeviceFooter(state: state)       // Rule 3
+        }
+    }
+
+    /// Above the device footer, so rule 3 still holds — the device never moves.
+    private var housekeeping: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            MenuRow(title: LoginItem.isEnabled ? "✓ Open at Login" : "Open at Login") {
+                LoginItem.toggle()
+            }
+            MenuRow(title: "Quit Fling", shortcut: "⌘Q") { NSApp.terminate(nil) }
+            Separator()
         }
     }
 
@@ -99,6 +117,11 @@ struct PanelView: View {
 
     private var casting: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Present here too, so "Cast this tab instead" can target either browser.
+            if state.installedBrowsers.count > 1 {
+                SourcePicker(state: state, options: state.installedBrowsers)
+                    .padding(.bottom, 8)
+            }
             artwork
 
             VStack(alignment: .leading, spacing: 3) {
@@ -135,20 +158,12 @@ struct PanelView: View {
             MenuRow(title: "Stop casting", shortcut: "⌘.") { Task { await state.stopCasting() } }
 
             Separator()
+            housekeeping
             DeviceFooter(state: state)       // Rule 3
         }
     }
 
-    // Rule 1 — artwork exists only while casting; idle reserves no space for it.
-    private var artwork: some View {
-        LinearGradient(colors: [Color(red: 0.18, green: 0.23, blue: 0.32),
-                                Color(red: 0.29, green: 0.20, blue: 0.32)],
-                       startPoint: .topLeading, endPoint: .bottomTrailing)
-            .frame(height: 84)
-            .overlay(Image(systemName: "play.fill")
-                .font(.system(size: 22))
-                .foregroundStyle(.white.opacity(0.35)))
-    }
+    private var artwork: some View { Artwork(url: state.tab?.thumbnailURL) }
 
     // Rule 5 — the failure explains itself where it happened.
     private func inlineWhy(_ reason: String) -> some View {

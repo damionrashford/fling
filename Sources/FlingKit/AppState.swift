@@ -12,6 +12,10 @@ public final class AppState: ObservableObject {
     @Published public var sourceChoice: SourceChoice = .none
     @Published public var volume: Int = 50
     @Published public var lastError: String?
+    /// Browsers present on this Mac, running or not. Drives picker visibility.
+    @Published public var installedBrowsers: [Browser] = Browser.installed
+    /// Which browser the panel is currently reading from.
+    @Published public var activeBrowser: Browser?
 
     private let catt: CattClient?
     private let browsers: BrowserReader
@@ -106,6 +110,7 @@ public final class AppState: ObservableObject {
             if selectedDevice == nil { selectedDevice = found.first }
         }
         sourceChoice = result.choice
+        if case .single(let browser) = result.choice { activeBrowser = browser }
         apply(tab: result.tab, status: result.status)
     }
 
@@ -120,8 +125,16 @@ public final class AppState: ObservableObject {
 
     public func select(browser: Browser) async {
         lastUsedBrowser = browser
+        activeBrowser = browser
         sourceChoice = .single(browser)
-        await refresh()
+
+        // Read the chosen browser directly. Going through refresh() would let
+        // frontmost-resolution override the explicit choice the user just made.
+        let reader = self.browsers
+        let tab = await Task.detached(priority: .userInitiated) {
+            try? reader.readTab(browser)
+        }.value
+        apply(tab: tab, status: status)
     }
 
     public func select(device: DeviceInfo) async {

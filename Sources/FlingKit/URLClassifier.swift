@@ -46,4 +46,22 @@ public struct URLClassifier {
 
         return .notCastable(reason: "Not a video page")
     }
+
+    /// The video id from any YouTube URL shape, or nil. Used to build a real
+    /// thumbnail so the idle panel can show what it is about to cast.
+    public static func youTubeVideoID(_ raw: String) -> String? {
+        guard let components = URLComponents(string: raw),
+              let host = components.host?.lowercased(),
+              youtubeHosts.contains(host)
+        else { return nil }
+
+        // youtu.be/<id>, /embed/<id>, /shorts/<id>
+        let segments = components.path.split(separator: "/").map(String.init)
+        if host == "youtu.be", let id = segments.first { return id.nilIfEmpty }
+        if segments.count >= 2, segments[0] == "embed" || segments[0] == "shorts" {
+            return segments[1].nilIfEmpty
+        }
+        // watch?v=<id>
+        return components.queryItems?.first(where: { $0.name == "v" })?.value?.nilIfEmpty
+    }
 }

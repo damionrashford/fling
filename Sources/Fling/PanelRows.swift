@@ -64,6 +64,42 @@ struct SlimProgress: View {
     }
 }
 
+/// Real preview image when the URL yields one, gradient placeholder otherwise.
+struct Artwork: View {
+    let url: URL?
+    var height: CGFloat = 84
+
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [Color(red: 0.18, green: 0.23, blue: 0.32),
+                                    Color(red: 0.29, green: 0.20, blue: 0.32)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            if let url {
+                AsyncImage(url: url) { phase in
+                    if let image = phase.image {
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } else if phase.error != nil {
+                        placeholderGlyph
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+            } else {
+                placeholderGlyph
+            }
+        }
+        .frame(height: height)
+        .frame(maxWidth: .infinity)
+        .clipped()
+    }
+
+    private var placeholderGlyph: some View {
+        Image(systemName: "play.fill")
+            .font(.system(size: 22))
+            .foregroundStyle(.white.opacity(0.35))
+    }
+}
+
 // MARK: - rows
 
 /// A menu-flavoured row: tight, with an optional right-aligned shortcut.
@@ -158,7 +194,9 @@ struct DeviceFooter: View {
     }
 }
 
-/// Rule 1: only rendered when both browsers are actually running.
+/// Shown whenever more than one supported browser is installed — running or
+/// not. Keying it off "running" made it vanish exactly when it was needed to
+/// reach a browser with no windows open.
 struct SourcePicker: View {
     @ObservedObject var state: AppState
     let options: [Browser]
@@ -166,7 +204,7 @@ struct SourcePicker: View {
     var body: some View {
         HStack(spacing: 3) {
             ForEach(options) { browser in
-                let selected = state.tab?.browser == browser
+                let selected = state.activeBrowser == browser
                 Button(browser.displayName) { Task { await state.select(browser: browser) } }
                     .buttonStyle(.plain)
                     .font(.system(size: 11, weight: selected ? .semibold : .regular))
