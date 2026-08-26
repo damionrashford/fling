@@ -2,7 +2,9 @@ import XCTest
 @testable import FlingKit
 
 /// Shared fake used by CattClient, BrowserSource, AppState, and PermissionProbe tests.
-final class FakeRunner: ProcessRunning {
+/// `@unchecked Sendable` because AppState hands its client to detached tasks;
+/// tests drive it sequentially and read `calls` only after awaiting.
+final class FakeRunner: ProcessRunning, @unchecked Sendable {
     var calls: [(exe: String, args: [String])] = []
     var stubbedOutput = ""
     var errorToThrow: Error?

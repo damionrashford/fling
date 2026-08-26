@@ -1,6 +1,6 @@
 import Foundation
 
-public struct JXARunner {
+public struct JXARunner: @unchecked Sendable {
     private let runner: ProcessRunning
     public init(runner: ProcessRunning = SystemProcessRunner()) { self.runner = runner }
 

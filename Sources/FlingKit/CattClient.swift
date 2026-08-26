@@ -5,7 +5,10 @@ public struct CattError: Error, Equatable {
     public init(_ message: String) { self.message = message }
 }
 
-public final class CattClient {
+/// `@unchecked Sendable`: both stored properties are `let`, and the production
+/// runner (`SystemProcessRunner`) is a stateless struct. Instances are handed to
+/// detached tasks so blocking subprocess calls stay off the main actor.
+public final class CattClient: @unchecked Sendable {
     private let executable: String
     private let runner: ProcessRunning
 

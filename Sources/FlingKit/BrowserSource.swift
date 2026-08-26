@@ -1,6 +1,8 @@
 import Foundation
 
-public struct BrowserReader {
+/// `@unchecked Sendable` for the same reason as `CattClient` — immutable, and
+/// used from detached tasks so `osascript` never blocks the main actor.
+public struct BrowserReader: @unchecked Sendable {
     private let jxa: JXARunner
 
     public init(runner: ProcessRunning = SystemProcessRunner()) {

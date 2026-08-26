@@ -16,6 +16,13 @@ public final class AppState: ObservableObject {
     private let catt: CattClient?
     private let browsers: BrowserReader
     private var lastUsedBrowser: Browser?
+    private var refreshing = false
+    private var volumeTask: Task<Void, Never>?
+
+    /// How long the volume slider settles before a command is sent. Dragging a
+    /// slider emits an event per pixel; without this, each one would spawn a
+    /// `catt` subprocess and hammer the TV.
+    public static let volumeDebounce = Duration.milliseconds(180)
 
     public init(catt: CattClient?, browsers: BrowserReader) {
         self.catt = catt
@@ -64,89 +71,127 @@ public final class AppState: ObservableObject {
         }
     }
 
-    // MARK: - actions
+    // MARK: - refresh
 
-    public func refresh() {
-        guard let catt else { return }
-        lastError = nil
+    /// Every call here is blocking subprocess I/O — `catt scan` alone takes about
+    /// ten seconds. It MUST run off the main actor, or the menu bar never draws.
+    public func refresh() async {
+        guard let catt, !refreshing else { return }
+        refreshing = true
+        defer { refreshing = false }
 
-        if devices.isEmpty, let found = try? catt.scan() {
+        let browsers = self.browsers
+        let lastUsed = self.lastUsedBrowser
+        let knownDevice = self.selectedDevice?.name
+        let needsScan = self.devices.isEmpty
+
+        let result = await Task.detached(priority: .userInitiated) { () -> RefreshResult in
+            let found = needsScan ? (try? catt.scan()) : nil
+
+            let running = Browser.allCases.filter { browsers.isRunning($0) }
+            let choice = BrowserResolver.resolve(running: running,
+                                                 frontmostApp: browsers.frontmostApp(),
+                                                 lastUsed: lastUsed)
+            var newTab: TabRef?
+            if case .single(let browser) = choice { newTab = try? browsers.readTab(browser) }
+
+            let deviceName = knownDevice ?? found?.first?.name
+            let status = deviceName.flatMap { try? catt.status(device: $0) } ?? .empty
+
+            return RefreshResult(devices: found, choice: choice, tab: newTab, status: status)
+        }.value
+
+        if let found = result.devices {
             devices = found
             if selectedDevice == nil { selectedDevice = found.first }
         }
-
-        let running = Browser.allCases.filter { browsers.isRunning($0) }
-        sourceChoice = BrowserResolver.resolve(running: running,
-                                               frontmostApp: browsers.frontmostApp(),
-                                               lastUsed: lastUsedBrowser)
-
-        var newTab: TabRef?
-        if case .single(let browser) = sourceChoice {
-            newTab = try? browsers.readTab(browser)
-        }
-
-        let newStatus = selectedDevice.flatMap { try? catt.status(device: $0.name) } ?? .empty
-        apply(tab: newTab, status: newStatus)
+        sourceChoice = result.choice
+        apply(tab: result.tab, status: result.status)
     }
 
-    public func select(browser: Browser) {
+    private struct RefreshResult: Sendable {
+        let devices: [DeviceInfo]?
+        let choice: SourceChoice
+        let tab: TabRef?
+        let status: CastStatus
+    }
+
+    // MARK: - actions
+
+    public func select(browser: Browser) async {
         lastUsedBrowser = browser
         sourceChoice = .single(browser)
-        refresh()
+        await refresh()
     }
 
-    public func select(device: DeviceInfo) {
+    public func select(device: DeviceInfo) async {
         selectedDevice = device
-        refresh()
+        await refresh()
     }
 
-    public func castCurrentTab() {
+    public func castCurrentTab() async {
         guard let tab else { lastError = "No page open"; return }
-        cast(tab.url, kind: tab.kind)
         lastUsedBrowser = tab.browser
+        await cast(tab.url, kind: tab.kind)
     }
 
-    public func castClipboard() {
+    public func castClipboard() async {
         guard let raw = ClipboardReader.read() else { lastError = "Clipboard is empty"; return }
-        cast(raw, kind: URLClassifier.classify(raw))
+        await cast(raw, kind: URLClassifier.classify(raw))
     }
 
-    public func togglePlayPause() {
-        perform { catt, device in
-            self.status.isPlaying ? try catt.pause(device: device) : try catt.play(device: device)
+    public func togglePlayPause() async {
+        let playing = status.isPlaying
+        await send { catt, device in
+            playing ? try catt.pause(device: device) : try catt.play(device: device)
         }
     }
 
-    public func seek(by seconds: Int) {
-        perform { catt, device in try catt.seek(by: seconds, device: device) }
+    public func seek(by seconds: Int) async {
+        await send { catt, device in try catt.seek(by: seconds, device: device) }
     }
 
-    public func stopCasting() {
-        perform { catt, device in try catt.stop(device: device) }
+    public func stopCasting() async {
+        await send { catt, device in try catt.stop(device: device) }
     }
 
+    /// Updates the slider immediately and sends the command once dragging settles.
+    /// Sync on purpose — the UI binding must not await.
     public func setVolume(_ level: Int) {
-        volume = min(100, max(0, level))   // optimistic; the slider must not lag
-        perform { catt, device in try catt.setVolume(level, device: device) }
+        volume = min(100, max(0, level))
+        let target = volume
+        volumeTask?.cancel()
+        volumeTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.volumeDebounce)
+            guard !Task.isCancelled, let self else { return }
+            await self.send { catt, device in try catt.setVolume(target, device: device) }
+        }
+    }
+
+    /// Awaits any in-flight debounced volume command. For tests and for shutdown.
+    public func flushVolume() async {
+        await volumeTask?.value
     }
 
     // MARK: - plumbing
 
-    private func cast(_ url: String, kind: CastKind) {
+    private func cast(_ url: String, kind: CastKind) async {
         if case .notCastable(let reason) = kind { lastError = reason; return }
-        perform { catt, device in try catt.cast(url, kind: kind, device: device) }
+        await send { catt, device in try catt.cast(url, kind: kind, device: device) }
     }
 
-    private func perform(_ body: (CattClient, String) throws -> Void) {
+    /// Runs a blocking `catt` command off the main actor, then reports the
+    /// outcome back on it.
+    private func send(_ body: @escaping @Sendable (CattClient, String) throws -> Void) async {
         guard let catt else { lastError = "catt is not installed"; return }
         guard let device = selectedDevice?.name else { lastError = "No device selected"; return }
-        do {
-            try body(catt, device)
-            lastError = nil
-        } catch let error as CattError {
-            lastError = error.message
-        } catch {
-            lastError = error.localizedDescription
-        }
+
+        let failure = await Task.detached(priority: .userInitiated) { () -> String? in
+            do { try body(catt, device); return nil }
+            catch let error as CattError { return error.message }
+            catch { return error.localizedDescription }
+        }.value
+
+        lastError = failure
     }
 }

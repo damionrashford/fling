@@ -6,6 +6,8 @@ let package = Package(
     platforms: [.macOS(.v14)],
     targets: [
         .target(name: "FlingKit", swiftSettings: [.swiftLanguageMode(.v5)]),
+        .executableTarget(name: "Fling", dependencies: ["FlingKit"],
+                          swiftSettings: [.swiftLanguageMode(.v5)]),
         .testTarget(name: "FlingKitTests", dependencies: ["FlingKit"],
                     swiftSettings: [.swiftLanguageMode(.v5)]),
     ]
