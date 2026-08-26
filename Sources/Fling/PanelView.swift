@@ -4,6 +4,9 @@ import FlingKit
 
 struct PanelView: View {
     @ObservedObject var state: AppState
+    /// Off in the preview harness — probing spawns osascript and would trigger
+    /// real consent dialogs just to look at the design.
+    var probesPermissions = true
     @State private var missingGrants: [Browser] = []
 
     var body: some View {
@@ -25,6 +28,7 @@ struct PanelView: View {
     }
 
     private func recheckPermissions() async {
+        guard probesPermissions else { return }
         missingGrants = await PermissionProbe().missingGrantsAsync()
         if missingGrants.isEmpty { await state.refresh() }
     }
@@ -58,6 +62,7 @@ struct PanelView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(state.tab?.title.nilIfEmpty ?? "No page open")
                     .font(.system(size: 12.5, weight: .semibold))
+                    .lineSpacing(1)
                     .lineLimit(2)
                 HStack(spacing: 4) {
                     Text(host).foregroundStyle(.secondary)
@@ -70,9 +75,9 @@ struct PanelView: View {
                 }
                 .font(.system(size: 11))
             }
-            .padding(.horizontal, 14).padding(.top, 11).padding(.bottom, 9)
+            .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 6)
 
-            Divider().padding(.horizontal, 10)
+            Separator()
 
             // Rule 4 — the only accented row. Rule 5 — stays visible when disabled.
             MenuRow(title: "Cast this tab", shortcut: "⌘⇧C",
@@ -83,9 +88,9 @@ struct PanelView: View {
 
             MenuRow(title: "Cast clipboard URL") { Task { await state.castClipboard() } }
 
-            Divider().padding(.horizontal, 10)
+            Separator()
             VolumeRow(state: state)          // Rule 2
-            Divider().padding(.horizontal, 10)
+            Separator()
             DeviceFooter(state: state)       // Rule 3
         }
     }
@@ -101,10 +106,10 @@ struct PanelView: View {
                     .font(.system(size: 12.5, weight: .semibold)).lineLimit(2)
                 Text(host).font(.system(size: 11)).foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 14).padding(.top, 11)
+            .padding(.horizontal, 14).padding(.top, 10)
 
             VStack(spacing: 5) {
-                ProgressView(value: state.progress).controlSize(.mini)
+                SlimProgress(value: state.progress)
                 HStack {
                     Text(state.elapsedLabel)
                     Spacer()
@@ -113,7 +118,7 @@ struct PanelView: View {
                 .font(.system(size: 10.5).monospacedDigit())
                 .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 14).padding(.top, 9).padding(.bottom, 4)
+            .padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 5)
 
             MenuRow(title: state.status.isPlaying ? "Pause" : "Play", shortcut: "Space") {
                 Task { await state.togglePlayPause() }
@@ -123,13 +128,13 @@ struct PanelView: View {
 
             VolumeRow(state: state)          // Rule 2 — same slot as idle
 
-            Divider().padding(.horizontal, 10)
+            Separator()
             MenuRow(title: "Cast this tab instead", shortcut: "⌘⇧C") {
                 Task { await state.castCurrentTab() }
             }
             MenuRow(title: "Stop casting", shortcut: "⌘.") { Task { await state.stopCasting() } }
 
-            Divider().padding(.horizontal, 10)
+            Separator()
             DeviceFooter(state: state)       // Rule 3
         }
     }

@@ -1,6 +1,71 @@
 import SwiftUI
 import FlingKit
 
+// MARK: - primitives
+
+/// SwiftUI's `Divider()` renders almost invisibly on the popover's material,
+/// which read as "no separation at all". This draws an explicit hairline.
+struct Separator: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.13))
+            .frame(height: 1)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+    }
+}
+
+/// 3pt track, 11pt knob — the stock `Slider` is far too heavy for a menu panel.
+struct SlimSlider: View {
+    @Binding var value: Double
+    var range: ClosedRange<Double> = 0...100
+
+    private let knob: CGFloat = 11
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let frac = CGFloat((value - range.lowerBound) / (range.upperBound - range.lowerBound))
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.primary.opacity(0.18)).frame(height: 3)
+                Capsule().fill(Color.primary.opacity(0.85))
+                    .frame(width: max(0, w * frac), height: 3)
+                Circle().fill(.white)
+                    .frame(width: knob, height: knob)
+                    .shadow(color: .black.opacity(0.4), radius: 1, y: 0.5)
+                    .offset(x: min(max(0, w * frac - knob / 2), w - knob))
+            }
+            .frame(height: knob)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0).onChanged { g in
+                    let f = min(1, max(0, g.location.x / max(w, 1)))
+                    value = range.lowerBound + Double(f) * (range.upperBound - range.lowerBound)
+                }
+            )
+        }
+        .frame(height: knob)
+    }
+}
+
+/// Matching 3pt bar for playback position, tinted rather than system-grey.
+struct SlimProgress: View {
+    let value: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.primary.opacity(0.18)).frame(height: 3)
+                Capsule().fill(Color.accentColor)
+                    .frame(width: geo.size.width * min(max(value, 0), 1), height: 3)
+            }
+        }
+        .frame(height: 3)
+    }
+}
+
+// MARK: - rows
+
 /// A menu-flavoured row: tight, with an optional right-aligned shortcut.
 struct MenuRow: View {
     let title: String
@@ -23,17 +88,17 @@ struct MenuRow: View {
                 }
             }
             .font(.system(size: 12.5))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3.5)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(hovering && enabled ? Color.accentColor.opacity(0.18) : Color.clear,
+            .background(hovering && enabled ? Color.accentColor.opacity(0.2) : Color.clear,
                         in: RoundedRectangle(cornerRadius: 5))
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.35)
+        .opacity(enabled ? 1 : 0.32)
         .onHover { hovering = $0 }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 6)
     }
 }
 
@@ -44,23 +109,22 @@ struct VolumeRow: View {
     var body: some View {
         HStack(spacing: 9) {
             Image(systemName: state.volume == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                .font(.system(size: 11))
+                .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
-                .frame(width: 14)
+                .frame(width: 13)
 
-            Slider(value: Binding(
+            SlimSlider(value: Binding(
                 get: { Double(state.volume) },
                 set: { state.setVolume(Int($0.rounded())) }
-            ), in: 0...100)
-            .controlSize(.mini)
+            ))
 
             Text("\(state.volume)")
                 .font(.system(size: 10.5).monospacedDigit())
                 .foregroundStyle(.tertiary)
-                .frame(width: 22, alignment: .trailing)
+                .frame(width: 20, alignment: .trailing)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 4)
+        .padding(.vertical, 3)
     }
 }
 
@@ -89,8 +153,8 @@ struct DeviceFooter: View {
             }
         }
         .padding(.horizontal, 14)
-        .padding(.top, 6)
-        .padding(.bottom, 10)
+        .padding(.top, 5)
+        .padding(.bottom, 9)
     }
 }
 
@@ -100,20 +164,22 @@ struct SourcePicker: View {
     let options: [Browser]
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             ForEach(options) { browser in
                 let selected = state.tab?.browser == browser
                 Button(browser.displayName) { Task { await state.select(browser: browser) } }
                     .buttonStyle(.plain)
                     .font(.system(size: 11, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
-                    .background(selected ? Color.accentColor.opacity(0.22)
-                                         : Color.primary.opacity(0.05),
-                                in: RoundedRectangle(cornerRadius: 6))
+                    .padding(.vertical, 3.5)
+                    .background(selected ? Color.accentColor.opacity(0.18)
+                                         : Color.primary.opacity(0.06),
+                                in: RoundedRectangle(cornerRadius: 5))
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 12)
         .padding(.top, 9)
+        .padding(.bottom, 2)
     }
 }
