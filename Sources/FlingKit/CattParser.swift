@@ -8,6 +8,7 @@ public enum CattParser {
         var duration: TimeInterval?
         var volume: Int?
         var muted = false
+        var state = PlaybackState.unknown
 
         for line in output.split(separator: "\n", omittingEmptySubsequences: true) {
             let l = line.trimmingCharacters(in: .whitespaces)
@@ -19,6 +20,8 @@ public enum CattParser {
                 volume = Int(v)
             } else if let v = value(after: "Title:", in: l) {
                 title = v.isEmpty ? nil : v
+            } else if let v = value(after: "State:", in: l) {
+                state = PlaybackState(catt: v)
             } else if let v = value(after: "Time:", in: l) {
                 // "00:00:01 / 00:00:15 (11%)"
                 let parts = v.split(separator: "/").map { $0.trimmingCharacters(in: .whitespaces) }
@@ -30,7 +33,7 @@ public enum CattParser {
             }
         }
         return CastStatus(title: title, elapsed: elapsed, duration: duration,
-                          volume: volume, muted: muted)
+                          volume: volume, muted: muted, state: state)
     }
 
     public static func parseScan(_ output: String) -> [DeviceInfo] {

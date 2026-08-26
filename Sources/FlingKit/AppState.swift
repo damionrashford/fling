@@ -64,7 +64,8 @@ public final class AppState: ObservableObject {
 
         guard catt != nil else { panel = .setupNeeded; return }
 
-        if status.isPlaying {
+        // hasMedia, not isPlaying — a paused video is still casting.
+        if status.hasMedia {
             panel = .casting
         } else if let tab, tab.kind.isCastable {
             panel = .idleCastable
