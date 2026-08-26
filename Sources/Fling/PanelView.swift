@@ -4,17 +4,29 @@ import FlingKit
 
 struct PanelView: View {
     @ObservedObject var state: AppState
+    @State private var missingGrants: [Browser] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            switch state.panel {
-            case .setupNeeded:                 setup
-            case .casting:                     casting
-            case .idleCastable:                idle(reason: nil)
-            case .idleNotCastable(let reason): idle(reason: reason)
+            if missingGrants.isEmpty {
+                switch state.panel {
+                case .setupNeeded:                 setup
+                case .casting:                     casting
+                case .idleCastable:                idle(reason: nil)
+                case .idleNotCastable(let reason): idle(reason: reason)
+                }
+            } else {
+                OnboardingView(missing: missingGrants) { await recheckPermissions() }
             }
         }
         .frame(width: 260)
+        // Probing spawns osascript per browser — never on the main actor.
+        .task { await recheckPermissions() }
+    }
+
+    private func recheckPermissions() async {
+        missingGrants = await PermissionProbe().missingGrantsAsync()
+        if missingGrants.isEmpty { await state.refresh() }
     }
 
     // MARK: - setup
