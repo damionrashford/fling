@@ -7,3 +7,4 @@ DerivedData/
 .vscode/
 build/dist/
 build/Fling-Install.zip
+Scripts/signing-identity.local

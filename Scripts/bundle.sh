@@ -3,7 +3,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="$ROOT/build/Fling.app"
-IDENTITY="REDACTED-LOCAL-IDENTITY"
+# Untracked local file, so the public repo carries no personal signing
+# identity. Falls back to ad-hoc signing, which works but resets macOS
+# Automation grants whenever the signature changes.
+IDENTITY="$(cat "$(dirname "$0")/signing-identity.local" 2>/dev/null || echo "-")"
 
 swift build -c release --package-path "$ROOT"
 
