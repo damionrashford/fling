@@ -1,10 +1,18 @@
-.superpowers/
+# build products
 .build/
+.build-atv/
+build/
 DerivedData/
 *.xcuserstate
-.DS_Store
-.build-atv/
+
+# local-only tooling and notes
+.claude/
+.superpowers/
 .vscode/
-build/dist/
-build/Fling-Install.zip
-Scripts/signing-identity.local
+docs/
+
+# machine-local secrets/config
+*.local
+
+# OS droppings
+.DS_Store
