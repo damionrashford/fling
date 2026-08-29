@@ -69,6 +69,19 @@ public final class CattClient: @unchecked Sendable {
         _ = try invoke(["-d", device, verb, String(abs(seconds))])
     }
 
+    /// Powers the TV screen on. The cast protocol has no power command, but
+    /// launching any receiver app makes the TV fire HDMI-CEC "One Touch Play",
+    /// which wakes the panel. The launch step's outcome is ignored on purpose:
+    /// DashCast's launch ack regularly outlives pychromecast's 10 s wait even
+    /// though the app comes up (observed live on the TCL, 2026-08-28). The
+    /// follow-up `stop` is the real signal — it confirms the TV answered and
+    /// returns it to the home screen instead of a blank DashCast page.
+    public func wake(device: String, settle: TimeInterval = 1.0) throws {
+        _ = try? invoke(["-d", device, "cast_site", "https://example.com"])
+        Thread.sleep(forTimeInterval: settle)
+        _ = try invoke(["-d", device, "stop"])
+    }
+
     // MARK: - plumbing
 
     /// `catt` exits 0 while printing errors to stdout, so the output is always

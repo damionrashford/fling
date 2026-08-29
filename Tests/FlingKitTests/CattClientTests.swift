@@ -101,6 +101,50 @@ final class CattClientTests: XCTestCase {
         }
     }
 
+    // MARK: - wake
+
+    /// Returns a different stubbed output per call, so the launch and stop
+    /// steps of `wake` can be driven to different outcomes.
+    private final class SequencedRunner: ProcessRunning, @unchecked Sendable {
+        var calls: [[String]] = []
+        var outputs: [String]
+
+        init(outputs: [String]) { self.outputs = outputs }
+
+        func run(_ executable: String, _ args: [String]) throws -> String {
+            calls.append(args)
+            return calls.count <= outputs.count ? outputs[calls.count - 1] : ""
+        }
+    }
+
+    func test_wake_launches_receiver_then_stops() throws {
+        let r = SequencedRunner(outputs: ["", ""])
+        try CattClient(executable: "/usr/bin/catt", runner: r).wake(device: "TV", settle: 0)
+        XCTAssertEqual(r.calls, [["-d", "TV", "cast_site", "https://example.com"],
+                                 ["-d", "TV", "stop"]])
+    }
+
+    // The TCL acks DashCast launches after pychromecast's 10 s wait expires,
+    // so a launch "timeout" must not abort the wake.
+    func test_wake_tolerates_launch_timeout_when_stop_succeeds() throws {
+        let r = SequencedRunner(outputs: [
+            "pychromecast.error.RequestTimeout: Execution of start app 84912283 timed out after 10.0 s.",
+            "",
+        ])
+        XCTAssertNoThrow(
+            try CattClient(executable: "/usr/bin/catt", runner: r).wake(device: "TV", settle: 0))
+        XCTAssertEqual(r.calls.count, 2)
+    }
+
+    func test_wake_surfaces_stop_failure_as_unreachable_tv() {
+        let r = SequencedRunner(outputs: ["", "Error: Failed to connect."])
+        XCTAssertThrowsError(
+            try CattClient(executable: "/usr/bin/catt", runner: r).wake(device: "TV", settle: 0)
+        ) { error in
+            XCTAssertEqual((error as? CattError)?.message, "Failed to connect.")
+        }
+    }
+
     func test_receiver_timeout_gets_human_message() {
         let r = FakeRunner()
         r.stubbedOutput = "pychromecast.error.RequestTimeout: Execution of start app 233637DE timed out after 10.0 s."
