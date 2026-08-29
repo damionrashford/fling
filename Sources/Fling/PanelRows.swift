@@ -105,6 +105,7 @@ struct Artwork: View {
 /// A menu-flavoured row: tight, with an optional right-aligned shortcut.
 struct MenuRow: View {
     let title: String
+    var icon: String? = nil
     var shortcut: String? = nil
     var accented = false
     var enabled = true
@@ -115,6 +116,12 @@ struct MenuRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 11))
+                        .foregroundStyle(accented ? Color.accentColor : Color.secondary)
+                        .frame(width: 15)
+                }
                 Text(title)
                     .foregroundStyle(accented ? Color.accentColor : Color.primary)
                     .fontWeight(accented ? .semibold : .regular)
@@ -164,39 +171,15 @@ struct VolumeRow: View {
     }
 }
 
-/// Top-level page switch. Underlined rather than chipped: the SourcePicker
-/// below already uses filled chips, and two chip rows read as one control.
-struct PagePicker: View {
-    @Binding var page: PanelPage
+/// Tiny uppercase section heading.
+struct SectionLabel: View {
+    let text: String
 
     var body: some View {
-        HStack(spacing: 0) {
-            tab("Cast", .cast)
-            tab("Remote", .remote)
-        }
-        .padding(.top, 7)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Color.primary.opacity(0.1)).frame(height: 1)
-        }
-    }
-
-    private func tab(_ title: String, _ target: PanelPage) -> some View {
-        let selected = page == target
-        return Button {
-            page = target
-        } label: {
-            Text(title)
-                .font(.system(size: 11.5, weight: selected ? .semibold : .regular))
-                .foregroundStyle(selected ? Color.primary : Color.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 5)
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(selected ? Color.accentColor : Color.clear)
-                        .frame(height: 2)
-                }
-        }
-        .buttonStyle(.plain)
+        Text(text)
+            .font(.system(size: 9.5, weight: .bold))
+            .tracking(0.8)
+            .foregroundStyle(.secondary)
     }
 }
 

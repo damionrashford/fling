@@ -2,21 +2,12 @@ import SwiftUI
 import AppKit
 import FlingKit
 
-enum PanelPage { case cast, remote }
-
 struct PanelView: View {
     @ObservedObject var state: AppState
     /// Off in the preview harness: probing spawns osascript and triggers real
     /// consent dialogs.
     var probesPermissions = true
     @State private var missingGrants: [Browser] = []
-    @State private var page: PanelPage
-
-    init(state: AppState, probesPermissions: Bool = true, initialPage: PanelPage = .cast) {
-        _state = ObservedObject(wrappedValue: state)
-        self.probesPermissions = probesPermissions
-        _page = State(initialValue: initialPage)
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -24,32 +15,29 @@ struct PanelView: View {
                 if case .setupNeeded = state.panel {
                     setup
                 } else {
-                    PagePicker(page: $page)
-                    switch page {
-                    case .cast:   castPage
-                    case .remote: RemoteView(state: state)
-                    }
+                    castSection
+                    Separator()
+                    RemoteView(state: state)
                     if let error = state.lastError {
                         Text(error)
                             .font(.system(size: 10.5)).foregroundStyle(.orange)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, 14).padding(.vertical, 4)
                     }
-                    // Shared chrome: the device footer is the last row of both pages.
                     Separator()
                     housekeeping
-                    DeviceFooter(state: state)
+                    DeviceFooter(state: state)    // always the last row
                 }
             } else {
                 OnboardingView(missing: missingGrants) { await recheckPermissions() }
             }
         }
-        .frame(width: 260)
+        .frame(width: 340)
         // Probing spawns osascript per browser — never on the main actor.
         .task { await recheckPermissions() }
     }
 
-    @ViewBuilder private var castPage: some View {
+    @ViewBuilder private var castSection: some View {
         switch state.panel {
         case .setupNeeded:                 setup
         case .casting:                     casting
@@ -90,7 +78,9 @@ struct PanelView: View {
             }
 
             if let thumb = state.tab?.thumbnailURL {
-                Artwork(url: thumb).padding(.top, 8)
+                Artwork(url: thumb, height: 108)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .padding(.horizontal, 12).padding(.top, 10)
             }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -114,7 +104,8 @@ struct PanelView: View {
             Separator()
 
             // The only accented row, and it stays visible when disabled.
-            MenuRow(title: state.resumeLabel ?? "Cast this tab", shortcut: "⌘⇧C",
+            MenuRow(title: state.resumeLabel ?? "Cast this tab",
+                    icon: "play.rectangle.on.rectangle", shortcut: "⌘⇧C",
                     accented: reason == nil, enabled: reason == nil) {
                 Task { await state.castCurrentTab() }
             }
@@ -126,7 +117,9 @@ struct PanelView: View {
                     .padding(.horizontal, 14).padding(.bottom, 6)
             }
 
-            MenuRow(title: "Cast clipboard URL") { Task { await state.castClipboard() } }
+            MenuRow(title: "Cast clipboard URL", icon: "doc.on.clipboard") {
+                Task { await state.castClipboard() }
+            }
 
             Separator()
             VolumeRow(state: state)          // same slot in every state
@@ -190,7 +183,11 @@ struct PanelView: View {
         }
     }
 
-    private var artwork: some View { Artwork(url: state.tab?.thumbnailURL) }
+    private var artwork: some View {
+        Artwork(url: state.tab?.thumbnailURL, height: 120)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, 12).padding(.top, 4)
+    }
 
     // The failure explains itself in place, next to the row that is disabled.
     private func inlineWhy(_ reason: String) -> some View {

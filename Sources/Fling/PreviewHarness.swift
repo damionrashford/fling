@@ -2,9 +2,10 @@ import AppKit
 import SwiftUI
 import FlingKit
 
-/// Development-only. `Fling --preview-panel` renders every panel state in a
+/// Development-only. `Fling --preview-panel` renders the panel's states in a
 /// normal window; the menu bar popover cannot be opened programmatically, so
-/// this is the only way to screenshot the design.
+/// this is the only way to screenshot the design. `FLING_PREVIEW=hero` renders
+/// the single panel used for the README screenshot.
 enum PreviewHarness {
 
     /// Returns "" for everything: no subprocess runs and no device is contacted.
@@ -28,18 +29,19 @@ enum PreviewHarness {
         let app = NSApplication.shared
         app.setActivationPolicy(.regular)
 
-        let idleCastable = makeState {
+        let idleUnpaired = makeState {
             $0.apply(tab: TabRef(url: "https://www.youtube.com/watch?v=gCcx85zbxz4",
                                  title: "Big Buck Bunny — Official Trailer",
                                  browser: .chrome),
                      status: CastStatus(title: nil, elapsed: nil, duration: nil,
                                         volume: 64, muted: false))
         }
-        let idleBlocked = makeState {
+        let idlePaired = makeState {
             $0.apply(tab: TabRef(url: "https://news.ycombinator.com",
                                  title: "Hacker News", browser: .chrome),
                      status: CastStatus(title: nil, elapsed: nil, duration: nil,
                                         volume: 64, muted: false))
+            $0.applyTVRemote(paired: true, isOn: true, currentApp: nil)
         }
         let ambiguous = makeState {
             $0.sourceChoice = .ambiguous([.chrome, .safari])
@@ -49,64 +51,39 @@ enum PreviewHarness {
                      status: CastStatus(title: nil, elapsed: nil, duration: nil,
                                         volume: 64, muted: false))
         }
-        let casting = makeState {
+        let castingPaired = makeState {
             $0.apply(tab: TabRef(url: "https://www.youtube.com/watch?v=gCcx85zbxz4",
                                  title: "Blade Runner 2049 — Official Trailer",
                                  browser: .chrome),
                      status: CastStatus(title: "Blade Runner 2049 — Official Trailer",
                                         elapsed: 72, duration: 188, volume: 64, muted: false))
-        }
-
-        let remoteUnpaired = makeState {
-            $0.apply(tab: nil, status: .empty)
-        }
-        let remotePaired = makeState {
-            $0.apply(tab: nil, status: .empty)
             $0.applyTVRemote(paired: true, isOn: true, currentApp: "com.netflix.ninja")
         }
 
-        // FLING_PREVIEW=hero renders only the two showcase panels, unlabelled.
         if ProcessInfo.processInfo.environment["FLING_PREVIEW"] == "hero" {
-            let hero = HStack(alignment: .top, spacing: 26) {
-                labelled("", casting)
-                labelled("", remotePaired, page: .remote)
-            }
-            .padding(30)
-            .background(Color(nsColor: .windowBackgroundColor))
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 640, height: 780),
-                styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            window.title = "Fling"
-            window.contentView = NSHostingView(rootView: hero)
-            window.center()
-            window.makeKeyAndOrderFront(nil)
-            app.activate(ignoringOtherApps: true)
-            app.run()
+            show(labelled("", castingPaired).padding(30),
+                 size: NSSize(width: 404, height: 1040), app: app)
             return
         }
 
-        // Two rows of three: six panels in one row overflow a 1512pt display
-        // and the last column is clipped out of screenshots.
-        let root = VStack(alignment: .leading, spacing: 22) {
-            HStack(alignment: .top, spacing: 22) {
-                labelled("idle · castable", idleCastable)
-                labelled("idle · blocked", idleBlocked)
-                labelled("idle · two browsers", ambiguous)
-            }
-            HStack(alignment: .top, spacing: 22) {
-                labelled("casting", casting)
-                labelled("remote · unpaired", remoteUnpaired, page: .remote)
-                labelled("remote · paired", remotePaired, page: .remote)
-            }
-        }
-        .padding(26)
-        .background(Color(nsColor: .windowBackgroundColor))
+        show(HStack(alignment: .top, spacing: 22) {
+                labelled("idle · unpaired", idleUnpaired)
+                labelled("idle · paired", idlePaired)
+                labelled("two browsers", ambiguous)
+                labelled("casting · paired", castingPaired)
+             }
+             .padding(26),
+             size: NSSize(width: 1500, height: 1100), app: app)
+    }
 
+    @MainActor
+    private static func show(_ root: some View, size: NSSize, app: NSApplication) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 940, height: 1240),
+            contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "Fling — panel states"
-        window.contentView = NSHostingView(rootView: root)
+        window.title = "Fling"
+        window.contentView = NSHostingView(
+            rootView: root.background(Color(nsColor: .windowBackgroundColor)))
         window.center()
         window.makeKeyAndOrderFront(nil)
         app.activate(ignoringOtherApps: true)
@@ -114,14 +91,15 @@ enum PreviewHarness {
     }
 
     @MainActor
-    private static func labelled(_ title: String, _ state: AppState,
-                                 page: PanelPage = .cast) -> some View {
+    private static func labelled(_ title: String, _ state: AppState) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title.uppercased())
-                .font(.system(size: 10, weight: .bold))
-                .tracking(0.8)
-                .foregroundStyle(.secondary)
-            PanelView(state: state, probesPermissions: false, initialPage: page)
+            if !title.isEmpty {
+                Text(title.uppercased())
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(0.8)
+                    .foregroundStyle(.secondary)
+            }
+            PanelView(state: state, probesPermissions: false)
                 .fixedSize()
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12)

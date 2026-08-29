@@ -14,7 +14,7 @@ power, apps, d-pad, volume, typing, voice search.
 ![Universal](https://img.shields.io/badge/binary-universal-4B8BBE)
 ![Tests](https://img.shields.io/badge/tests-206%20passing-2EA44F)
 
-<img src=".github/panel.png" width="520" alt="Fling's Cast page while playing, and the Remote page with app launcher, d-pad, volume, and voice search">
+<img src=".github/panel.png" width="340" alt="Fling's panel while casting: playback controls, app launcher, d-pad, volume, typing, and voice search in one view">
 
 </div>
 

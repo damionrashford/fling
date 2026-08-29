@@ -1,8 +1,8 @@
 import SwiftUI
 import FlingKit
 
-/// The "Remote" page: power, app launcher, d-pad, volume keys, and typing,
-/// all over the Android TV Remote session. Casting lives on the "Cast" page.
+/// The TV section of the panel: power, app launcher, d-pad, volume keys, and
+/// typing, all over the Android TV Remote session.
 struct RemoteView: View {
     @ObservedObject var state: AppState
     @State private var typed = ""
@@ -38,8 +38,9 @@ struct RemoteView: View {
                 .font(.system(size: 11)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 6)
-            MenuRow(title: "Turn TV On") { Task { await state.wakeTV() } }
-            MenuRow(title: "Set Up TV Power…", accented: true) {
+            MenuRow(title: "Turn TV On", icon: "power") { Task { await state.wakeTV() } }
+            MenuRow(title: "Set Up TV Power…", icon: "dot.radiowaves.left.and.right",
+                    accented: true) {
                 Task { await state.startTVPairing() }
             }
         }
@@ -52,31 +53,38 @@ struct RemoteView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             appGrid
-            Separator()
-            dpad
-            navRow
-            Separator()
+            VStack(spacing: 0) {
+                dpad
+                navRow
+            }
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.045)))
+            .padding(.horizontal, 12).padding(.bottom, 8)
             volumeKeys
             typeRow
         }
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
-            Text(nowLabel)
-                .font(.system(size: 12.5, weight: .semibold))
-                .lineLimit(1)
+        HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                SectionLabel(text: "ON THE TV")
+                if let subtitle = headerSubtitle {
+                    Text(subtitle)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .lineLimit(1)
+                }
+            }
             Spacer()
-            KeyButton(symbol: "power", size: 24, state: state, code: ATVKeyCode.power)
+            KeyButton(symbol: "power", size: 26, state: state, code: ATVKeyCode.power)
                 .help(powerHelp)
         }
         .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 8)
     }
 
-    private var nowLabel: String {
+    private var headerSubtitle: String? {
         if let package = state.tvCurrentApp { return "Now: \(TVApp.displayName(forPackage: package))" }
         if state.tvIsOn == false { return "TV is off" }
-        return "TV Remote"
+        return nil
     }
 
     private var powerHelp: String {
@@ -88,7 +96,7 @@ struct RemoteView: View {
     }
 
     private var appGrid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 3),
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 4),
                   spacing: 4) {
             ForEach(TVApp.catalog) { app in
                 AppChip(name: app.name, active: app.package == state.tvCurrentApp) {
@@ -121,7 +129,7 @@ struct RemoteView: View {
             KeyPill(symbol: "house", label: "Home",
                     state: state, code: ATVKeyCode.home)
         }
-        .padding(.horizontal, 12).padding(.bottom, 8)
+        .padding(.horizontal, 10).padding(.bottom, 10)
     }
 
     private var volumeKeys: some View {
