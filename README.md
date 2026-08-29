@@ -60,9 +60,9 @@ update.
    TV's name appears in the panel footer with a green dot when found.
 4. **Open a video and hit ⌘⇧C** — the tab is on the TV.
 
-To unlock the Remote page (power, apps, d-pad, voice), do the one-time
-pairing: **Remote** tab → **Set Up TV Power…** → the TV shows a 6-character
-code → type it into the panel → **Pair**.
+To unlock the TV controls (power, apps, d-pad, voice), do the one-time
+pairing: in the panel's **On the TV** section click **Set Up TV Power…** →
+the TV shows a 6-character code → type it into the panel → **Pair**.
 
 ## Casting
 
@@ -96,9 +96,10 @@ so you can cast from a browser that isn't frontmost.
 
 ## Controlling the TV
 
-Everything below lives on the **Remote** tab and needs the one-time pairing
-(see Quick start). Until you pair, the tab offers **Turn TV On** — a wake
-that works on any Chromecast by nudging the TV over HDMI-CEC.
+Everything below lives in the panel's **On the TV** section and needs the
+one-time pairing (see Quick start). Until you pair, the section offers
+**Turn TV On** — a wake that works on any Chromecast by nudging the TV over
+HDMI-CEC.
 
 - **Power** — the ⏻ button toggles the TV. The label tracks the TV's real
   state once connected.
