@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src=".github/logo.svg" width="88" alt="">
+
 # Fling
 
 **Your TV, from the Mac menu bar.**
