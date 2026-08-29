@@ -13,5 +13,7 @@
     <key>LSUIElement</key><true/>
     <key>NSAppleEventsUsageDescription</key>
     <string>Fling reads the address of your frontmost browser tab so it can send it to your TV.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Fling streams your voice to the TV for voice search.</string>
 </dict>
 </plist>

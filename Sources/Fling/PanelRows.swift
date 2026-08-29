@@ -164,6 +164,82 @@ struct VolumeRow: View {
     }
 }
 
+/// Top-level page switch. Underline style on purpose — the SourcePicker below
+/// it already uses filled chips, and two adjacent chip rows read as one
+/// control.
+struct PagePicker: View {
+    @Binding var page: PanelPage
+
+    var body: some View {
+        HStack(spacing: 0) {
+            tab("Cast", .cast)
+            tab("Remote", .remote)
+        }
+        .padding(.top, 7)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Color.primary.opacity(0.1)).frame(height: 1)
+        }
+    }
+
+    private func tab(_ title: String, _ target: PanelPage) -> some View {
+        let selected = page == target
+        return Button {
+            page = target
+        } label: {
+            Text(title)
+                .font(.system(size: 11.5, weight: selected ? .semibold : .regular))
+                .foregroundStyle(selected ? Color.primary : Color.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 5)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(selected ? Color.accentColor : Color.clear)
+                        .frame(height: 2)
+                }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// PIN entry for Android TV Remote pairing, shown while the TV displays its
+/// 6-character code.
+struct TVPinEntry: View {
+    @ObservedObject var state: AppState
+    @State private var pin = ""
+
+    private var verifying: Bool { state.tvPairing == .verifying }
+    private var code: String { pin.trimmingCharacters(in: .whitespaces).uppercased() }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Enter the code on the TV screen")
+                .font(.system(size: 11.5)).foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                TextField("A1B2C3", text: $pin)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+                    .disabled(verifying)
+                    .onSubmit { submit() }
+                if verifying {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Button("Pair") { submit() }
+                        .font(.system(size: 11.5))
+                        .disabled(code.count != 6)
+                    Button("Cancel") { Task { await state.cancelTVPairing() } }
+                        .font(.system(size: 11.5))
+                }
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 6)
+    }
+
+    private func submit() {
+        guard code.count == 6 else { return }
+        Task { await state.submitTVPIN(code) }
+    }
+}
+
 /// Rule 3: always the footer, never moves.
 struct DeviceFooter: View {
     @ObservedObject var state: AppState

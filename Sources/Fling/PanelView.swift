@@ -2,21 +2,38 @@ import SwiftUI
 import AppKit
 import FlingKit
 
+enum PanelPage { case cast, remote }
+
 struct PanelView: View {
     @ObservedObject var state: AppState
     /// Off in the preview harness — probing spawns osascript and would trigger
     /// real consent dialogs just to look at the design.
     var probesPermissions = true
     @State private var missingGrants: [Browser] = []
+    @State private var page: PanelPage
+
+    init(state: AppState, probesPermissions: Bool = true, initialPage: PanelPage = .cast) {
+        _state = ObservedObject(wrappedValue: state)
+        self.probesPermissions = probesPermissions
+        _page = State(initialValue: initialPage)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if missingGrants.isEmpty {
-                switch state.panel {
-                case .setupNeeded:                 setup
-                case .casting:                     casting
-                case .idleCastable:                idle(reason: nil)
-                case .idleNotCastable(let reason): idle(reason: reason)
+                if case .setupNeeded = state.panel {
+                    setup
+                } else {
+                    PagePicker(page: $page)
+                    switch page {
+                    case .cast:   castPage
+                    case .remote: RemoteView(state: state)
+                    }
+                    // Shared chrome — rule 3 holds on both pages: the device
+                    // footer never moves.
+                    Separator()
+                    housekeeping
+                    DeviceFooter(state: state)
                 }
             } else {
                 OnboardingView(missing: missingGrants) { await recheckPermissions() }
@@ -25,6 +42,15 @@ struct PanelView: View {
         .frame(width: 260)
         // Probing spawns osascript per browser — never on the main actor.
         .task { await recheckPermissions() }
+    }
+
+    @ViewBuilder private var castPage: some View {
+        switch state.panel {
+        case .setupNeeded:                 setup
+        case .casting:                     casting
+        case .idleCastable:                idle(reason: nil)
+        case .idleNotCastable(let reason): idle(reason: reason)
+        }
     }
 
     private func recheckPermissions() async {
@@ -96,9 +122,6 @@ struct PanelView: View {
 
             Separator()
             VolumeRow(state: state)          // Rule 2
-            Separator()
-            housekeeping
-            DeviceFooter(state: state)       // Rule 3
         }
     }
 
@@ -156,10 +179,6 @@ struct PanelView: View {
                 Task { await state.castCurrentTab() }
             }
             MenuRow(title: "Stop casting", shortcut: "⌘.") { Task { await state.stopCasting() } }
-
-            Separator()
-            housekeeping
-            DeviceFooter(state: state)       // Rule 3
         }
     }
 
