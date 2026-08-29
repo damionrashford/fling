@@ -12,11 +12,16 @@ power, apps, d-pad, volume, typing, voice search.
 ![Universal](https://img.shields.io/badge/binary-universal-4B8BBE)
 ![Tests](https://img.shields.io/badge/tests-206%20passing-2EA44F)
 
-<img src=".github/panel.png" width="640" alt="Fling's Cast page while playing, and the Remote page with app launcher, d-pad, volume, and voice search">
+<img src=".github/panel.png" width="520" alt="Fling's Cast page while playing, and the Remote page with app launcher, d-pad, volume, and voice search">
 
 </div>
 
 ---
+
+**Contents** · [Install](#install) · [Quick start](#quick-start) ·
+[Casting](#casting) · [Controlling the TV](#controlling-the-tv) ·
+[Troubleshooting](#troubleshooting) · [Update / uninstall](#update--uninstall) ·
+[Compatibility](#compatibility) · [Privacy](#privacy) · [Development](#development)
 
 ## Install
 
@@ -27,34 +32,123 @@ curl -fsSLO https://raw.githubusercontent.com/damionrashford/fling/main/Scripts/
 bash get-fling.sh
 ```
 
-That's the whole install — and the update command too. It pulls the universal
-binary straight from this repo, assembles the app in /Applications, installs
-the Cast engine ([catt](https://github.com/skorokithakis/catt) via
-[uv](https://docs.astral.sh/uv/)), and launches it. curl downloads carry no
-quarantine flag, so there is no Gatekeeper "Open Anyway" dance.
+The script pulls the universal binary straight from this repo, assembles the
+app in /Applications, installs the Cast engine
+([catt](https://github.com/skorokithakis/catt) via
+[uv](https://docs.astral.sh/uv/)), and launches Fling. curl downloads carry no
+quarantine flag, so there is no Gatekeeper "Open Anyway" step.
 
-> **Requirements** — macOS 14+, on the same Wi-Fi network as the TV.
+**Requirements:** macOS 14+, and your Mac on the same Wi-Fi network as the TV.
 
-## Features
+## Quick start
 
-| Cast | Remote |
+1. **Find the icon** — Fling lives in the menu bar (top right). Click it to
+   open the panel.
+2. **Approve two prompts** — macOS asks permission for Fling to talk to
+   Chrome and Safari. That's how it reads the address of your current tab;
+   it never touches page content.
+3. **Wait a moment** — the first network scan takes about ten seconds. Your
+   TV's name appears in the panel footer with a green dot when found.
+4. **Open a video and hit ⌘⇧C** — the tab is on the TV.
+
+To unlock the Remote page (power, apps, d-pad, voice), do the one-time
+pairing: **Remote** tab → **Set Up TV Power…** → the TV shows a 6-character
+code → type it into the panel → **Pair**.
+
+## Casting
+
+Open a video page in Chrome or Safari, then either press **⌘⇧C** (works
+system-wide, even with the panel closed) or click **Cast this tab**.
+**Cast clipboard URL** casts a link you've copied instead.
+
+What plays: YouTube, direct media files (mp4, mkv, mp3, …), and most video
+sites. Plain web pages don't — a Chromecast plays media streams, and the
+panel tells you when a page isn't castable.
+
+While casting, the panel shows artwork, title, and progress, with these
+controls (active while the panel is open):
+
+| Key | Action |
 |---|---|
-| Cast the frontmost Chrome or Safari tab (⌘⇧C) | True power on/off over the Android TV Remote protocol |
-| Cast a URL from the clipboard | App launcher with the TV's foreground app highlighted |
-| Play/pause, seek, debounced volume slider | D-pad, OK, Back, Home |
-| Artwork, progress, playback state | Instant volume and mute — raw keycodes, no subprocess lag |
-| Works with YouTube, direct media, extractable sites | Type on the TV from the Mac keyboard |
-| | Voice search — the mic button streams the Mac microphone to the TV |
-| | CEC wake button that works before pairing |
+| ⌘⇧C | Cast the current tab (system-wide) |
+| Space | Play / pause |
+| ← / → | Back / forward 30 seconds |
+| ⌘. | Stop casting |
 
-## First run
+Both browsers installed? A Chrome/Safari picker sits at the top of the panel
+so you can cast from a browser that isn't frontmost.
 
-1. Approve the browser-access prompts — that's how Fling reads the current tab.
-2. **Remote** tab → **Set Up TV Power…** — the TV displays a 6-character
-   code; type it in. Once per Mac.
-3. Voice search asks for microphone access on first use.
+## Controlling the TV
 
-## Build from source
+Everything below lives on the **Remote** tab and needs the one-time pairing
+(see Quick start). Until you pair, the tab offers **Turn TV On** — a wake
+that works on any Chromecast by nudging the TV over HDMI-CEC.
+
+- **Power** — the ⏻ button toggles the TV. The label tracks the TV's real
+  state once connected.
+- **Now playing** — the header shows which app the TV has in the foreground
+  ("Now: Netflix"), and that app lights up in the launcher grid.
+- **App launcher** — one click opens YouTube, Netflix, Prime Video, Disney+,
+  Spotify, Plex, or Tubi on the TV.
+- **D-pad** — arrows, OK, Back, Home. Navigate anything.
+- **Volume** — Vol−, Mute, Vol+ act instantly on the TV (the Cast page's
+  slider controls the cast stream instead).
+- **Type on TV** — put the TV's cursor in any text field (search, login),
+  type in the panel, hit return. The text lands on the TV in one shot.
+- **Voice search** — click the mic, speak, click again. Your Mac microphone
+  streams to the TV's voice search — same as talking into the TV remote.
+  macOS asks for microphone access the first time.
+
+**More than one TV?** The panel footer shows the active device; a **Switch**
+menu appears when several are on the network. Pairing is per-TV.
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| "No device found" in the footer | Same Wi-Fi network? Some routers isolate wireless clients ("AP isolation") which blocks discovery — check the router setting. The scan also takes ~10 s after the panel opens. |
+| "The TV did not respond" | The TV is in deep standby or unplugged. Click **Turn TV On** first, then retry. |
+| Pairing code rejected | Codes expire quickly. Run **Set Up TV Power…** again and type the fresh code. |
+| Remote worked before, now "Couldn't reach the TV" | A TV factory reset or OS update clears its paired remotes. Re-run **Set Up TV Power…**. |
+| Typed text goes nowhere | The TV needs a text field focused on screen first — the protocol commits into the active field only. |
+| Mic button does nothing | System Settings → Privacy & Security → Microphone → enable Fling. |
+| Panel says "Fling needs catt" | The Cast engine is missing — rerun the install one-liner, or use the panel's **Copy install command**. |
+| A normal article page won't cast | Expected — Chromecast plays media streams, not web pages. Open a video page. |
+
+## Update / uninstall
+
+**Update** — rerun the install one-liner. It replaces the app in place; your
+TV pairing survives.
+
+**Uninstall** —
+
+```sh
+rm -rf /Applications/Fling.app "$HOME/Library/Application Support/Fling"
+uv tool uninstall catt
+```
+
+The Application Support folder holds the TV pairing certificate; the pairing
+also has a keychain item named "Fling Android TV Remote" you can delete in
+Keychain Access.
+
+## Compatibility
+
+| | Chromecast (all models) | Google TV / Android TV |
+|---|:---:|:---:|
+| Casting, playback control, wake | ✓ | ✓ |
+| Power, apps, d-pad, typing, voice | — | ✓ |
+
+The Remote page speaks the Android TV Remote protocol, which classic
+Chromecast dongles don't run. TVs with Google TV or Android TV built in
+(TCL, Sony, Hisense, Philips, Chromecast with Google TV, …) support
+everything.
+
+## Privacy
+
+Everything runs on your LAN. No servers, no accounts, no analytics, nothing
+phones home. The mic streams to your TV only while the mic button is red.
+
+## Development
 
 ```sh
 swift build && swift test    # 206 tests
@@ -62,20 +156,8 @@ swift build && swift test    # 206 tests
 ./Scripts/publish-bin.sh     # refresh bin/Fling, the binary the installer serves
 ```
 
-`Fling --preview-panel` renders every panel state in one window for design
-work; `FLING_PREVIEW=hero` renders the two-panel shot above.
-
-## Architecture
-
-- **Casting** shells out to [`catt`](https://github.com/skorokithakis/catt)
-  (pychromecast underneath).
-- **Remote** is a from-scratch, dependency-free Swift implementation of the
-  Android TV Remote protocol v2 in
-  [`Sources/FlingKit/AndroidTVRemote/`](Sources/FlingKit/AndroidTVRemote/):
-  TLS client-certificate pairing on port 6467, a protobuf message channel on
-  6466 — key events, app links, IME text, and PCM voice streaming, with
-  hand-rolled protobuf and golden-byte tests throughout.
-- **Wake without pairing** launches a throwaway cast receiver; the TV's
-  HDMI-CEC "One Touch Play" turns the panel on.
-
-Everything runs on your LAN. Nothing phones home.
+`Fling --preview-panel` renders every panel state in one window;
+`FLING_PREVIEW=hero` renders the screenshot above. The Remote implementation
+is a dependency-free Android TV Remote protocol v2 client —
+TLS certificate pairing, hand-rolled protobuf, golden-byte tests — in
+[`Sources/FlingKit/AndroidTVRemote/`](Sources/FlingKit/AndroidTVRemote/).
