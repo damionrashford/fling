@@ -5,14 +5,19 @@ tab (Chrome or Safari) to a Chromecast / Google TV, and drive the TV itself —
 power, app launcher, d-pad, instant volume, typing into TV fields, and voice
 search from the Mac microphone — over the Android TV Remote protocol.
 
-## Install (no App Store)
+## Install
 
-1. Download `Fling-Install.zip` from [Releases](../../releases), unzip.
-2. Right-click **Install Fling.command** → Open → Open. One time only —
-   the app ships outside the App Store, so plain double-click is blocked.
-3. The installer copies Fling to /Applications, installs the Cast engine
-   ([catt](https://github.com/skorokithakis/catt) via [uv](https://docs.astral.sh/uv/)),
-   and launches the app.
+Paste in Terminal:
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/damionrashford/fling/main/Scripts/get-fling.sh
+bash get-fling.sh
+```
+
+It fetches the latest release, installs Fling to /Applications, installs the
+Cast engine ([catt](https://github.com/skorokithakis/catt) via
+[uv](https://docs.astral.sh/uv/)), and launches the app. curl downloads skip
+Gatekeeper quarantine, so no "Open Anyway" dance.
 
 Requirements: macOS 14+, same Wi-Fi network as the TV.
 
