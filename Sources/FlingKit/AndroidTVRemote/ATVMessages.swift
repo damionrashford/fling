@@ -181,7 +181,9 @@ enum ATVRemoteMessage {
     static func configureReply(features: Features) -> Data {
         var w = ProtoWriter()
         w.message(Field.remoteConfigure) { c in
-            c.varint(1, features.rawValue)      // code1
+            // proto3 zero omission, matching python-protobuf byte-for-byte
+            // even for a degenerate all-zero intersection.
+            if features.rawValue != 0 { c.varint(1, features.rawValue) }  // code1
             c.message(2) { d in                 // device_info
                 d.varint(3, 1)                  // unknown1
                 d.string(4, "1")                // unknown2
@@ -195,7 +197,8 @@ enum ATVRemoteMessage {
     static func setActive(features: Features) -> Data {
         var w = ProtoWriter()
         w.message(Field.remoteSetActive) { s in
-            s.varint(1, features.rawValue)
+            // proto3 zero omission; the empty submessage still marks presence.
+            if features.rawValue != 0 { s.varint(1, features.rawValue) }
         }
         return w.data
     }

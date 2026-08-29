@@ -15,6 +15,8 @@ final class ATVFramedConnection: @unchecked Sendable {
     private var buffer: [UInt8] = []
     private var startContinuation: CheckedContinuation<Void, Error>?
     private var timedOut = false
+    /// "host:port", for log lines.
+    private let endpoint: String
 
     /// The TV's self-signed certificate, captured during the TLS handshake.
     /// The pairing secret is computed over its RSA public numbers.
@@ -45,6 +47,7 @@ final class ATVFramedConnection: @unchecked Sendable {
                                   port: NWEndpoint.Port(rawValue: port)!,
                                   using: NWParameters(tls: tls))
         self.capture = capture
+        self.endpoint = "\(host):\(port)"
     }
 
     /// Bridges the verify block (set up before `self` is fully initialized) to
@@ -60,6 +63,7 @@ final class ATVFramedConnection: @unchecked Sendable {
     private let capture: CertificateCapture
 
     func start(timeout: TimeInterval = 15) async throws {
+        ATVLog.shared.log("conn", "\(endpoint) connect start")
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             lock.lock()
             startContinuation = continuation
@@ -69,9 +73,18 @@ final class ATVFramedConnection: @unchecked Sendable {
                 guard let self else { return }
                 switch state {
                 case .ready:
+                    ATVLog.shared.log("conn", "\(self.endpoint) tls established")
                     self.resumeStart(.success(()))
                 case .failed(let error):
-                    self.resumeStart(.failure(ATVError.connectionFailed(error.localizedDescription)))
+                    // Before `.ready` the failure happened inside the TLS
+                    // handshake, which the reference treats as "the TV no
+                    // longer trusts this certificate" (androidtv_remote.py
+                    // maps ssl.SSLError to InvalidAuth). Keep that distinct
+                    // from a mid-session drop so the app can suggest
+                    // re-pairing.
+                    let stage = self.startPending ? "handshake" : "session"
+                    ATVLog.shared.log("conn", "\(self.endpoint) \(stage) failed: \(error)")
+                    self.resumeStart(.failure(Self.startFailure(error)))
                     self.connection.cancel()
                 case .cancelled:
                     self.lock.lock()
@@ -97,6 +110,30 @@ final class ATVFramedConnection: @unchecked Sendable {
         }
     }
 
+    private var startPending: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return startContinuation != nil
+    }
+
+    /// Failures while `start()` is still pending happened during the TLS
+    /// handshake. A TLS alert or a reset after TCP came up means the server
+    /// aborted the handshake — the paired-certificate rejection signature —
+    /// mapped distinctly; anything else (routing, refusal) stays
+    /// `connectionFailed`. `String(describing:)` keeps the NWError domain and
+    /// code verbatim for the log and the UI.
+    static func startFailure(_ error: NWError) -> ATVError {
+        let text = String(describing: error)
+        switch error {
+        case .tls:
+            return .tlsHandshakeFailed(text)
+        case .posix(let code) where code == .ECONNRESET || code == .EPIPE:
+            return .tlsHandshakeFailed(text)
+        default:
+            return .connectionFailed(text)
+        }
+    }
+
     private func resumeStart(_ result: Result<Void, Error>) {
         lock.lock()
         let continuation = startContinuation
@@ -108,9 +145,10 @@ final class ATVFramedConnection: @unchecked Sendable {
     func send(_ message: Data) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             connection.send(content: ProtoFrame.encode(message),
-                            completion: .contentProcessed { error in
+                            completion: .contentProcessed { [endpoint] error in
                 if let error {
-                    continuation.resume(throwing: ATVError.connectionFailed(error.localizedDescription))
+                    ATVLog.shared.log("conn", "\(endpoint) send failed: \(error)")
+                    continuation.resume(throwing: ATVError.connectionFailed(String(describing: error)))
                 } else {
                     continuation.resume()
                 }
@@ -142,12 +180,14 @@ final class ATVFramedConnection: @unchecked Sendable {
 
     private func receiveChunk() async throws -> [UInt8] {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[UInt8], Error>) in
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, isComplete, error in
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [endpoint] data, _, isComplete, error in
                 if let error {
-                    continuation.resume(throwing: ATVError.connectionFailed(error.localizedDescription))
+                    ATVLog.shared.log("conn", "\(endpoint) receive failed: \(error)")
+                    continuation.resume(throwing: ATVError.connectionFailed(String(describing: error)))
                 } else if let data, !data.isEmpty {
                     continuation.resume(returning: [UInt8](data))
                 } else if isComplete {
+                    ATVLog.shared.log("conn", "\(endpoint) closed by peer")
                     continuation.resume(throwing: ATVError.connectionClosed)
                 } else {
                     continuation.resume(returning: [])
@@ -157,19 +197,24 @@ final class ATVFramedConnection: @unchecked Sendable {
     }
 
     func cancel() {
+        ATVLog.shared.log("conn", "\(endpoint) cancel")
         connection.cancel()
     }
 }
 
 /// Races `operation` against a wall clock. The operation is not
-/// cancellation-responsive, so callers must cancel the underlying connection
-/// when this throws `.connectionTimeout` to unblock the losing task.
+/// cancellation-responsive, so the task group cannot drain — and therefore
+/// cannot propagate the timeout — until `onDeadline` unblocks it by cancelling
+/// the underlying connection. Without that hook the deadline never actually
+/// fired: the group sat on the stuck receive until the OS TCP timeout.
 func withATVDeadline<T: Sendable>(seconds: TimeInterval,
+                                  onDeadline: (@Sendable () -> Void)? = nil,
                                   _ operation: @escaping @Sendable () async throws -> T) async throws -> T {
     try await withThrowingTaskGroup(of: T.self) { group in
         group.addTask { try await operation() }
         group.addTask {
             try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            onDeadline?()
             throw ATVError.connectionTimeout
         }
         let result = try await group.next()!

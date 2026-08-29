@@ -4,6 +4,11 @@ import Foundation
 /// enum Equatable so UI code can match on cases.
 public enum ATVError: Error, Equatable {
     case connectionFailed(String)
+    /// The server aborted the TLS handshake itself (alert, or reset right
+    /// after TCP came up). On port 6466 this is the signature of the TV no
+    /// longer trusting the client certificate — the fix is re-pairing, not
+    /// retrying. Payload is the verbatim NWError text.
+    case tlsHandshakeFailed(String)
     case connectionClosed
     case connectionTimeout
     case notConnected

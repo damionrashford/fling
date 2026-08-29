@@ -386,6 +386,8 @@ public final class AppState: ObservableObject {
             return "That code doesn't match — read it off the TV again."
         case ATVError.serverStatus:
             return "The TV rejected the pairing code. Start over."
+        case ATVError.tlsHandshakeFailed:
+            return "The TV no longer trusts this Mac — run TV power setup again."
         case ATVError.connectionFailed(let detail):
             return "Couldn't reach the TV (\(detail))."
         case ATVError.connectionClosed:

@@ -100,6 +100,18 @@ final class AndroidTVRemoteMessageTests: XCTestCase {
             ATVTestHex.data("0a1c08ef04121718012201312a0961747672656d6f74653205312e302e30"))
     }
 
+    func test_configure_reply_zero_features_omits_code1() {
+        // proto3 zero omission: python-protobuf drops code1=0, keeping only
+        // device_info. Degenerate (an empty intersection), but byte-exact.
+        XCTAssertEqual(
+            ATVRemoteMessage.configureReply(features: []),
+            ATVTestHex.data("0a19121718012201312a0961747672656d6f74653205312e302e30"))
+    }
+
+    func test_set_active_zero_features_is_empty_submessage() {
+        XCTAssertEqual(ATVRemoteMessage.setActive(features: []), ATVTestHex.data("1200"))
+    }
+
     func test_set_active_golden_bytes() {
         XCTAssertEqual(ATVRemoteMessage.setActive(features: .requested),
                        ATVTestHex.data("120308e704"))

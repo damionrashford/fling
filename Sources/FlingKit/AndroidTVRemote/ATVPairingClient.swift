@@ -17,6 +17,7 @@ public actor ATVPairingClient {
     /// the TV displays the PIN.
     public func start(host: String, port: UInt16 = 6467) async throws {
         cancel()
+        ATVLog.shared.log("pair", "pairing start \(host):\(port)")
         let identity = try store.loadIdentity()
         let connection = ATVFramedConnection(host: host, port: port, identity: identity)
         self.connection = connection
@@ -34,7 +35,9 @@ public actor ATVPairingClient {
             try await connection.send(ATVPairingMessage.configuration())
             let configurationAck = try await receive(on: connection)
             guard configurationAck.hasConfigurationAck else { throw ATVError.unexpectedMessage }
+            ATVLog.shared.log("pair", "configuration acked — TV is showing the PIN")
         } catch {
+            ATVLog.shared.log("pair", "pairing start failed: \(error)")
             cancel()
             throw error
         }
@@ -55,7 +58,9 @@ public actor ATVPairingClient {
             try await connection.send(ATVPairingMessage.secret(secret))
             let ack = try await receive(on: connection)
             guard ack.hasSecretAck else { throw ATVError.unexpectedMessage }
+            ATVLog.shared.log("pair", "secret acked — paired")
         } catch {
+            ATVLog.shared.log("pair", "pairing finish failed: \(error)")
             cancel()
             throw error
         }
@@ -70,7 +75,7 @@ public actor ATVPairingClient {
     /// Any non-OK status is terminal and closes the connection (e.g.
     /// STATUS_BAD_SECRET 402 for a wrong PIN).
     private func receive(on connection: ATVFramedConnection) async throws -> ATVPairingMessage.Inbound {
-        let message = try await withATVDeadline(seconds: 30) {
+        let message = try await withATVDeadline(seconds: 30, onDeadline: { connection.cancel() }) {
             try await connection.receiveMessage()
         }
         let inbound = try ATVPairingMessage.parse(message)
