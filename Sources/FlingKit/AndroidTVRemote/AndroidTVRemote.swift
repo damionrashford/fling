@@ -1,0 +1,186 @@
+import Foundation
+
+/// Errors surfaced by the Android TV remote subsystem. String payloads keep the
+/// enum Equatable so UI code can match on cases.
+public enum ATVError: Error, Equatable {
+    case connectionFailed(String)
+    case connectionClosed
+    case connectionTimeout
+    case notConnected
+    case pairingNotStarted
+    /// Pairing status other than STATUS_OK — 402 is a rejected secret.
+    case serverStatus(UInt64)
+    case unexpectedMessage
+    case invalidPIN(String)
+    case certificateFailure(String)
+    case noHostConfigured
+    case notPaired
+    case invalidText
+    /// Voice was not negotiated — construct the facade with `enableVoice: true`.
+    case voiceNotEnabled
+    case voiceSessionActive
+    case voiceSessionInactive
+    /// The TV never answered KEYCODE_SEARCH with RemoteVoiceBegin.
+    case voiceTimeout
+}
+
+/// App-facing facade over the Android TV Remote protocol v2 client: one-time
+/// pairing (port 6467) and the power/key session (port 6466).
+///
+/// Pairing call order for the UI:
+///   1. `hasPairing(host:)` — false means run pairing first.
+///   2. `startPairing(host:)` — returns when the TV is showing the PIN.
+///   3. `finishPairing(pin:)` — with the PIN the user typed; records the host.
+///   4. Thereafter `togglePower(host:)` connects on demand and toggles.
+public actor AndroidTVRemote {
+
+    public let store: ATVCertificateStore
+    private let clientName: String
+    private let remote: ATVRemoteClient
+    private var pairing: ATVPairingClient?
+    private var pairingHost: String?
+    private var lastHost: String?
+
+    /// `enableVoice` negotiates the VOICE feature so `beginVoice`/`sendVoice`
+    /// work. It is off by default because, once negotiated, KEYCODE_SEARCH puts
+    /// the TV into mic-listening mode instead of opening plain typed search.
+    public init(clientName: String = "Fling",
+                store: ATVCertificateStore = .shared,
+                enableVoice: Bool = false) {
+        self.clientName = clientName
+        self.store = store
+        self.remote = ATVRemoteClient(store: store, enableVoice: enableVoice)
+    }
+
+    // MARK: - pairing
+
+    /// Client-side record only: the identity exists and this host acked our
+    /// secret once. The TV clearing its side shows up as a TLS failure on
+    /// `connect`, which is the signal to re-pair.
+    public nonisolated func hasPairing(host: String) -> Bool {
+        store.identityExists && store.pairedHosts().contains(host)
+    }
+
+    /// When this returns, the TV is displaying a 6-hex-character PIN.
+    public func startPairing(host: String) async throws {
+        await pairing?.cancel()
+        let client = ATVPairingClient(clientName: clientName, store: store)
+        pairing = client
+        pairingHost = host
+        try await client.start(host: host)
+    }
+
+    public func finishPairing(pin: String) async throws {
+        guard let pairing, let pairingHost else { throw ATVError.pairingNotStarted }
+        try await pairing.finish(pin: pin)
+        store.recordPairedHost(pairingHost)
+        self.pairing = nil
+        self.pairingHost = nil
+    }
+
+    public func cancelPairing() async {
+        await pairing?.cancel()
+        pairing = nil
+        pairingHost = nil
+    }
+
+    // MARK: - remote session
+
+    public func connect(host: String) async throws {
+        guard hasPairing(host: host) else { throw ATVError.notPaired }
+        lastHost = host
+        try await remote.connect(host: host)
+    }
+
+    public func disconnect() async {
+        await remote.disconnect()
+    }
+
+    public var isConnected: Bool {
+        get async { await remote.isConnected }
+    }
+
+    /// Power state from the TV's last RemoteStart; meaningful once connected.
+    public var isOn: Bool {
+        get async { await remote.isOn }
+    }
+
+    /// Foreground app package reported by the TV over the session, nil if
+    /// unknown or the launcher is showing.
+    public var currentApp: String? {
+        get async { await remote.currentApp }
+    }
+
+    /// Toggles power, connecting first if needed. Pass `host` on the first call;
+    /// later calls fall back to the last host used.
+    public func togglePower(host: String? = nil) async throws {
+        try await ensureConnected(host: host)
+        try await remote.powerToggle()
+    }
+
+    /// Sends any keycode (see `ATVKeyCode`), connecting on demand.
+    public func pressKey(_ code: Int32, host: String? = nil) async throws {
+        try await ensureConnected(host: host)
+        try await remote.sendKey(code)
+    }
+
+    /// Launches an app, connecting on demand. A bare app id (no URL scheme) is
+    /// turned into a `market://launch?id=…` link, matching the reference.
+    public func launchApp(link: String, host: String? = nil) async throws {
+        try await ensureConnected(host: host)
+        try await remote.launchApp(link: Self.normalizeAppLink(link))
+    }
+
+    /// Commits text via the IME, connecting on demand. See the type docs: this
+    /// only lands when a text field is focused on the TV.
+    public func sendText(_ text: String, host: String? = nil) async throws {
+        try await ensureConnected(host: host)
+        try await remote.sendText(text)
+    }
+
+    // MARK: - voice
+
+    /// Opens a voice session (KEYCODE_SEARCH → RemoteVoiceBegin handshake).
+    /// Requires the facade to have been constructed with `enableVoice: true`.
+    public func beginVoice(host: String? = nil) async throws {
+        try await ensureConnected(host: host)
+        try await remote.beginVoice()
+    }
+
+    /// Streams one PCM chunk: 16-bit little-endian, mono, 8000 Hz. Chunks under
+    /// 8 KB are zero-padded; over 20 KB are split.
+    public func sendVoice(pcm: Data) async throws {
+        try await remote.sendVoice(pcm: pcm)
+    }
+
+    public func endVoice() async throws {
+        try await remote.endVoice()
+    }
+
+    /// Connection, power, and foreground-app events from the remote session.
+    public func events() async -> AsyncStream<ATVRemoteClient.Event> {
+        await remote.events()
+    }
+
+    // MARK: - plumbing
+
+    private func ensureConnected(host: String?) async throws {
+        if let host { lastHost = host }
+        guard let target = lastHost else { throw ATVError.noHostConfigured }
+        if !(await remote.isConnected) {
+            try await connect(host: target)
+        }
+    }
+
+    /// androidtv_remote.py send_launch_app_command: a value without a URL scheme
+    /// is a Play Store package id.
+    static func normalizeAppLink(_ link: String) -> String {
+        hasURLScheme(link) ? link : "market://launch?id=\(link)"
+    }
+
+    private static func hasURLScheme(_ link: String) -> Bool {
+        guard let range = link.range(of: "://") else { return false }
+        let scheme = link[link.startIndex ..< range.lowerBound]
+        return !scheme.isEmpty && scheme.allSatisfy { $0.isLetter || $0.isNumber || $0 == "+" || $0 == "-" || $0 == "." }
+    }
+}
