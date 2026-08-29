@@ -80,7 +80,7 @@ enum PreviewHarness {
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 640, height: 780),
                 styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            window.title = "Fling — panel states"
+            window.title = "Fling"
             window.contentView = NSHostingView(rootView: hero)
             window.center()
             window.makeKeyAndOrderFront(nil)
