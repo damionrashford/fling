@@ -17,20 +17,24 @@ public extension TVApp {
     /// The remote protocol has no "list installed apps" call, so the launcher
     /// is a curated catalog. Links follow the Home Assistant androidtv_remote
     /// community lists and are not verified per TV model.
+    /// Custom schemes route uniquely to the app; https links make Android TV
+    /// offer a browser/chooser instead. Apps without a scheme use the bare
+    /// package name, which the transport turns into a market:// launch — that
+    /// opens the installed app directly.
     static let catalog: [TVApp] = [
-        TVApp(name: "YouTube", link: "https://www.youtube.com",
+        TVApp(name: "YouTube", link: "vnd.youtube.launch://",
               package: "com.google.android.youtube.tv"),
-        TVApp(name: "Netflix", link: "https://www.netflix.com/title",
+        TVApp(name: "Netflix", link: "netflix://",
               package: "com.netflix.ninja"),
-        TVApp(name: "Prime Video", link: "https://app.primevideo.com",
+        TVApp(name: "Prime Video", link: "com.amazon.amazonvideo.livingroom",
               package: "com.amazon.amazonvideo.livingroom"),
-        TVApp(name: "Disney+", link: "https://www.disneyplus.com",
+        TVApp(name: "Disney+", link: "com.disney.disneyplus",
               package: "com.disney.disneyplus"),
         TVApp(name: "Spotify", link: "spotify://",
               package: "com.spotify.tv.android"),
         TVApp(name: "Plex", link: "plex://",
               package: "com.plexapp.android"),
-        TVApp(name: "Tubi", link: "https://tubitv.com",
+        TVApp(name: "Tubi", link: "com.tubitv",
               package: "com.tubitv"),
     ]
 
