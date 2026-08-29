@@ -1,33 +1,29 @@
 #!/usr/bin/env bash
-# Installs the latest Fling release on this Mac. curl-fetched files carry no
-# quarantine attribute, so this needs no Gatekeeper "Open Anyway" dance.
+# Installs Fling straight from the repo — no zip, no releases page. Pulls the
+# universal binary from bin/ and assembles the .app locally. curl-fetched
+# files carry no quarantine attribute, so there is no Gatekeeper dance.
 set -euo pipefail
 
-REPO="damionrashford/fling"
-
-echo "==> Finding latest Fling release"
-ZIP_URL="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
-    | grep -o '"browser_download_url": *"[^"]*Fling-Install\.zip"' \
-    | head -1 | sed 's/.*"\(https[^"]*\)"/\1/')"
-[ -n "$ZIP_URL" ] || { echo "error: no release asset found"; exit 1; }
+RAW="https://raw.githubusercontent.com/damionrashford/fling/main"
+APP="/Applications/Fling.app"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-echo "==> Downloading $ZIP_URL"
-curl -fsSL "$ZIP_URL" -o "$TMP/fling.zip"
-ditto -x -k "$TMP/fling.zip" "$TMP"
+echo "==> Downloading Fling"
+curl -fsSL "$RAW/bin/Fling" -o "$TMP/Fling"
+curl -fsSL "$RAW/Resources/Info.plist" -o "$TMP/Info.plist"
 
-echo "==> Installing to /Applications"
+echo "==> Installing to $APP"
 killall Fling 2>/dev/null || true
-rm -rf /Applications/Fling.app
-ditto "$TMP/Fling/Fling.app" /Applications/Fling.app
-# Belt and braces — harmless when the attribute is absent.
-xattr -dr com.apple.quarantine /Applications/Fling.app 2>/dev/null || true
-# The signature was made on another Mac; if this one rejects it, an ad-hoc
-# local signature always passes.
-codesign --verify /Applications/Fling.app 2>/dev/null \
-    || codesign --force --deep -s - /Applications/Fling.app
+rm -rf "$APP"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+mv "$TMP/Fling" "$APP/Contents/MacOS/Fling"
+mv "$TMP/Info.plist" "$APP/Contents/Info.plist"
+chmod +x "$APP/Contents/MacOS/Fling"
+# Local ad-hoc signature: macOS always accepts it, and it never carries
+# anyone's identity.
+codesign --force --deep -s - "$APP"
 
 if [ ! -x "$HOME/.local/bin/catt" ] && ! command -v catt >/dev/null 2>&1; then
     if [ ! -x "$HOME/.local/bin/uv" ] && ! command -v uv >/dev/null 2>&1; then
@@ -41,7 +37,7 @@ if [ ! -x "$HOME/.local/bin/catt" ] && ! command -v catt >/dev/null 2>&1; then
 fi
 
 echo "==> Launching Fling"
-open /Applications/Fling.app
+open "$APP"
 echo ""
 echo "Done — Fling is the cast icon in the menu bar."
 echo "First run: approve the permission prompts, then Remote tab ->"

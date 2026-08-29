@@ -14,9 +14,10 @@ curl -fsSLO https://raw.githubusercontent.com/damionrashford/fling/main/Scripts/
 bash get-fling.sh
 ```
 
-It fetches the latest release, installs Fling to /Applications, installs the
-Cast engine ([catt](https://github.com/skorokithakis/catt) via
-[uv](https://docs.astral.sh/uv/)), and launches the app. curl downloads skip
+It pulls the universal binary straight from this repo, assembles the app in
+/Applications, installs the Cast engine
+([catt](https://github.com/skorokithakis/catt) via
+[uv](https://docs.astral.sh/uv/)), and launches it. curl downloads skip
 Gatekeeper quarantine, so no "Open Anyway" dance.
 
 Requirements: macOS 14+, same Wi-Fi network as the TV.
@@ -30,7 +31,7 @@ in. Pairing is once per Mac.
 ```sh
 swift build && swift test
 ./Scripts/bundle.sh      # signed .app in build/ (put your identity in Scripts/signing-identity.local)
-./Scripts/package.sh     # shareable installer zip
+./Scripts/publish-bin.sh # refresh bin/Fling, the binary the installer serves
 ```
 
 `Fling --preview-panel` renders every panel state in a window for design work.
