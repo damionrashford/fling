@@ -53,12 +53,7 @@ struct RemoteView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             appGrid
-            VStack(spacing: 0) {
-                dpad
-                navRow
-            }
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.045)))
-            .padding(.horizontal, 12).padding(.bottom, 8)
+            dpad
             volumeKeys
             typeRow
         }
@@ -107,29 +102,25 @@ struct RemoteView: View {
         .padding(.horizontal, 12).padding(.bottom, 8)
     }
 
+    /// Classic remote layout — Back and Home flank the OK row.
     private var dpad: some View {
-        VStack(spacing: 5) {
-            KeyButton(symbol: "chevron.up", state: state, code: ATVKeyCode.dpadUp)
-            HStack(spacing: 18) {
-                KeyButton(symbol: "chevron.left", state: state, code: ATVKeyCode.dpadLeft)
+        VStack(spacing: 6) {
+            KeyButton(symbol: "chevron.up", size: 30, state: state, code: ATVKeyCode.dpadUp)
+            HStack(spacing: 13) {
+                KeyButton(symbol: "arrow.uturn.backward", size: 30,
+                          state: state, code: ATVKeyCode.back)
+                    .help("Back")
+                KeyButton(symbol: "chevron.left", size: 30, state: state, code: ATVKeyCode.dpadLeft)
                 KeyButton(label: "OK", size: 40, accented: true,
                           state: state, code: ATVKeyCode.dpadCenter)
-                KeyButton(symbol: "chevron.right", state: state, code: ATVKeyCode.dpadRight)
+                KeyButton(symbol: "chevron.right", size: 30, state: state, code: ATVKeyCode.dpadRight)
+                KeyButton(symbol: "house", size: 30, state: state, code: ATVKeyCode.home)
+                    .help("Home")
             }
-            KeyButton(symbol: "chevron.down", state: state, code: ATVKeyCode.dpadDown)
+            KeyButton(symbol: "chevron.down", size: 30, state: state, code: ATVKeyCode.dpadDown)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 8).padding(.bottom, 6)
-    }
-
-    private var navRow: some View {
-        HStack(spacing: 5) {
-            KeyPill(symbol: "arrow.uturn.backward", label: "Back",
-                    state: state, code: ATVKeyCode.back)
-            KeyPill(symbol: "house", label: "Home",
-                    state: state, code: ATVKeyCode.home)
-        }
-        .padding(.horizontal, 10).padding(.bottom, 10)
+        .padding(.top, 6).padding(.bottom, 10)
     }
 
     private var volumeKeys: some View {
@@ -151,6 +142,7 @@ struct RemoteView: View {
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 12))
                     .onSubmit { sendTyped() }
+                    .help("Lands in whatever text field is focused on the TV")
                 Button {
                     Task { await state.toggleVoiceSearch() }
                 } label: {
@@ -165,9 +157,10 @@ struct RemoteView: View {
                             in: RoundedRectangle(cornerRadius: 5))
                 .help(state.tvVoiceActive ? "Stop voice search" : "Voice search")
             }
-            Text(state.tvVoiceActive ? "Listening — click the mic again when done."
-                                     : "Text lands in the focused field on the TV.")
-                .font(.system(size: 10)).foregroundStyle(.tertiary)
+            if state.tvVoiceActive {
+                Text("Listening — click the mic again when done.")
+                    .font(.system(size: 10)).foregroundStyle(.red)
+            }
         }
         .padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 9)
     }

@@ -109,8 +109,11 @@ struct PanelView: View {
                     accented: reason == nil, enabled: reason == nil) {
                 Task { await state.castCurrentTab() }
             }
-            if let reason { inlineWhy(reason) }
-            if let browser = state.probeHint {
+            // One contextual line, not a stack: the failure explanation when
+            // blocked, otherwise the resume-toggle hint when it matters.
+            if let reason {
+                inlineWhy(reason)
+            } else if let browser = state.probeHint {
                 Text("Turn on \(browser.displayName) ▸ Develop ▸ Allow JavaScript from Apple Events to resume videos where you left off.")
                     .font(.system(size: 10)).foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -121,8 +124,12 @@ struct PanelView: View {
                 Task { await state.castClipboard() }
             }
 
-            Separator()
-            VolumeRow(state: state)          // same slot in every state
+            // Paired idle gets TV volume keys in the TV section instead; two
+            // volume controls at once read as a mistake.
+            if !state.tvPaired {
+                Separator()
+                VolumeRow(state: state)
+            }
         }
     }
 

@@ -386,8 +386,14 @@ public final class AppState: ObservableObject {
             return "That code doesn't match — read it off the TV again."
         case ATVError.serverStatus:
             return "The TV rejected the pairing code. Start over."
-        case ATVError.connectionFailed, ATVError.connectionTimeout, ATVError.connectionClosed:
-            return "Couldn't reach the TV. If this keeps happening, re-run TV power setup."
+        case ATVError.connectionFailed(let detail):
+            return "Couldn't reach the TV (\(detail))."
+        case ATVError.connectionClosed:
+            return "The TV closed the connection during the handshake."
+        case ATVError.connectionTimeout:
+            return "The TV didn't answer."
+        case ATVError.certificateFailure(let detail):
+            return "Certificate problem (\(detail))."
         case ATVError.notPaired, ATVError.pairingNotStarted:
             return "Run TV power setup first."
         default:
