@@ -123,7 +123,8 @@ menu appears when several are on the network. Pairing is per-TV.
 | Mic button does nothing | System Settings → Privacy & Security → Microphone → enable Fling. |
 | Panel says "Fling needs catt" | The Cast engine is missing — rerun the install one-liner, or use the panel's **Copy install command**. |
 | A normal article page won't cast | Expected — Chromecast plays media streams, not web pages. Open a video page. |
-| No "Resume on TV" even mid-video | Enable the browser's Allow JavaScript from Apple Events toggle (Chrome: View ▸ Developer; Safari: Develop menu). |
+| No "Resume on TV" even mid-video | Enable the browser's Allow JavaScript from Apple Events toggle (Chrome: View ▸ Developer; Safari: Develop menu). Chrome tracks it per profile. |
+| Permission prompts came back after updating | Expected with unsigned distribution — each update is a new signature to macOS. Approve once and they stay until the next update. |
 
 ## Update / uninstall
 

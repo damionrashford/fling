@@ -29,6 +29,12 @@ struct PanelView: View {
                     case .cast:   castPage
                     case .remote: RemoteView(state: state)
                     }
+                    if let error = state.lastError {
+                        Text(error)
+                            .font(.system(size: 10.5)).foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 14).padding(.vertical, 4)
+                    }
                     // Shared chrome: the device footer is the last row of both pages.
                     Separator()
                     housekeeping
