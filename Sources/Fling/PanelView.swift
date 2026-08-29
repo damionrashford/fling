@@ -108,11 +108,17 @@ struct PanelView: View {
             Separator()
 
             // The only accented row, and it stays visible when disabled.
-            MenuRow(title: "Cast this tab", shortcut: "⌘⇧C",
+            MenuRow(title: state.resumeLabel ?? "Cast this tab", shortcut: "⌘⇧C",
                     accented: reason == nil, enabled: reason == nil) {
                 Task { await state.castCurrentTab() }
             }
             if let reason { inlineWhy(reason) }
+            if let browser = state.probeHint {
+                Text("Turn on \(browser.displayName) ▸ Develop ▸ Allow JavaScript from Apple Events to resume videos where you left off.")
+                    .font(.system(size: 10)).foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 14).padding(.bottom, 6)
+            }
 
             MenuRow(title: "Cast clipboard URL") { Task { await state.castClipboard() } }
 

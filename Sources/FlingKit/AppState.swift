@@ -35,9 +35,14 @@ public final class AppState: ObservableObject {
     @Published public private(set) var tvCurrentApp: String?
     /// True while the Mac microphone is streaming to the TV's voice search.
     @Published public private(set) var tvVoiceActive = false
+    /// What the current tab's page is actually playing, from the in-page probe.
+    @Published public private(set) var tabMedia: TabMedia?
+    /// Browser whose "Allow JavaScript from Apple Events" toggle is off.
+    @Published public private(set) var probeHint: Browser?
 
     private let catt: CattClient?
     private let browsers: BrowserReader
+    private let prober: TabProber?
     private let atv: AndroidTVRemote?
     private var atvEvents: Task<Void, Never>?
     private var voiceCapture: VoiceCapture?
@@ -51,10 +56,12 @@ public final class AppState: ObservableObject {
     /// emits an event per pixel, and each one would spawn a `catt` subprocess.
     public static let volumeDebounce = Duration.milliseconds(180)
 
-    public init(catt: CattClient?, browsers: BrowserReader, atv: AndroidTVRemote? = nil) {
+    public init(catt: CattClient?, browsers: BrowserReader, atv: AndroidTVRemote? = nil,
+                prober: TabProber? = nil) {
         self.catt = catt
         self.browsers = browsers
         self.atv = atv
+        self.prober = prober
         self.panel = catt == nil ? .setupNeeded : .idleNotCastable(reason: "No page open")
     }
 
@@ -118,6 +125,7 @@ public final class AppState: ObservableObject {
         defer { refreshing = false }
 
         let browsers = self.browsers
+        let prober = self.prober
         let lastUsed = self.lastUsedBrowser
         let knownDevice = self.selectedDevice?.name
         let needsScan = self.devices.isEmpty
@@ -131,11 +139,13 @@ public final class AppState: ObservableObject {
                                                  lastUsed: lastUsed)
             var newTab: TabRef?
             if case .single(let browser) = choice { newTab = try? browsers.readTab(browser) }
+            let (media, hint) = Self.probe(newTab, with: prober)
 
             let deviceName = knownDevice ?? found?.first?.name
             let status = deviceName.flatMap { try? catt.status(device: $0) } ?? .empty
 
-            return RefreshResult(devices: found, choice: choice, tab: newTab, status: status)
+            return RefreshResult(devices: found, choice: choice, tab: newTab,
+                                 status: status, media: media, probeHint: hint)
         }.value
 
         if let found = result.devices {
@@ -145,7 +155,18 @@ public final class AppState: ObservableObject {
         }
         sourceChoice = result.choice
         if case .single(let browser) = result.choice { activeBrowser = browser }
+        tabMedia = result.media
+        probeHint = result.probeHint
         apply(tab: result.tab, status: result.status)
+    }
+
+    /// Best-effort: a failed probe never blocks casting by URL.
+    private nonisolated static func probe(_ tab: TabRef?, with prober: TabProber?)
+        -> (TabMedia?, Browser?) {
+        guard let prober, let tab else { return (nil, nil) }
+        do { return (try prober.probe(tab.browser), nil) }
+        catch TabProbeError.jsFromAppleEventsDisabled(let browser) { return (nil, browser) }
+        catch { return (nil, nil) }
     }
 
     private struct RefreshResult: Sendable {
@@ -153,6 +174,8 @@ public final class AppState: ObservableObject {
         let choice: SourceChoice
         let tab: TabRef?
         let status: CastStatus
+        let media: TabMedia?
+        let probeHint: Browser?
     }
 
     // MARK: - actions
@@ -165,9 +188,15 @@ public final class AppState: ObservableObject {
         // Read the chosen browser directly: refresh() would let
         // frontmost-resolution override the explicit choice.
         let reader = self.browsers
-        let tab = await Task.detached(priority: .userInitiated) {
-            try? reader.readTab(browser)
+        let prober = self.prober
+        let (tab, media, hint) = await Task.detached(priority: .userInitiated)
+            { () -> (TabRef?, TabMedia?, Browser?) in
+            let tab = try? reader.readTab(browser)
+            let (media, hint) = Self.probe(tab, with: prober)
+            return (tab, media, hint)
         }.value
+        tabMedia = media
+        probeHint = hint
         apply(tab: tab, status: status)
     }
 
@@ -180,7 +209,18 @@ public final class AppState: ObservableObject {
     public func castCurrentTab() async {
         guard let tab else { lastError = "No page open"; return }
         lastUsedBrowser = tab.browser
-        await cast(tab.url, kind: tab.kind)
+        let plan = CastPlanner.plan(tab: tab, media: tabMedia)
+        await cast(plan.url, kind: plan.kind, seekTo: plan.seekTo)
+    }
+
+    /// Seek position the next cast would start at, nil when starting fresh.
+    public var resumeAt: TimeInterval? {
+        guard let tab else { return nil }
+        return CastPlanner.plan(tab: tab, media: tabMedia).seekTo
+    }
+
+    public var resumeLabel: String? {
+        resumeAt.map { "Resume on TV at " + Self.clock($0) }
     }
 
     public func castClipboard() async {
@@ -375,9 +415,11 @@ public final class AppState: ObservableObject {
 
     // MARK: - plumbing
 
-    private func cast(_ url: String, kind: CastKind) async {
+    private func cast(_ url: String, kind: CastKind, seekTo: TimeInterval? = nil) async {
         if case .notCastable(let reason) = kind { lastError = reason; return }
-        await send { catt, device in try catt.cast(url, kind: kind, device: device) }
+        await send { catt, device in
+            try catt.cast(url, kind: kind, device: device, seekTo: seekTo)
+        }
     }
 
     /// Runs a blocking `catt` command off the main actor, then reports the

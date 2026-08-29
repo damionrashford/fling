@@ -83,6 +83,22 @@ final class CattClientTests: XCTestCase {
         XCTAssertEqual(r.calls[0].args, ["-d", "TV", "rewind", "30"])
     }
 
+    // Options must precede the URL: click stops option parsing at the first
+    // positional argument.
+    func test_cast_with_resume_passes_seek_before_url() throws {
+        let r = FakeRunner()
+        try client(r).cast("https://ex.com/a.mp4", kind: .directMedia,
+                           device: "TV", seekTo: 754.4)
+        XCTAssertEqual(r.calls[0].args, ["-d", "TV", "cast", "-f", "-t", "754",
+                                         "https://ex.com/a.mp4"])
+    }
+
+    func test_cast_resume_under_one_second_is_dropped() throws {
+        let r = FakeRunner()
+        try client(r).cast("https://youtu.be/a", kind: .youtube, device: "TV", seekTo: 0.4)
+        XCTAssertEqual(r.calls[0].args, ["-d", "TV", "cast", "https://youtu.be/a"])
+    }
+
     func test_status_parses_output() throws {
         let r = FakeRunner()
         r.stubbedOutput = "Title: X\nTime: 00:00:10 / 00:01:00 (16%)\nVolume: 40\nVolume muted: False"

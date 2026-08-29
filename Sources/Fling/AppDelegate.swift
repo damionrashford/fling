@@ -12,7 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // With voice negotiated, KEYCODE_SEARCH puts the TV into mic-listening
         // mode; typed search still works through IME text.
         let state = AppState(catt: catt, browsers: BrowserReader(),
-                             atv: AndroidTVRemote(enableVoice: true))
+                             atv: AndroidTVRemote(enableVoice: true),
+                             prober: TabProber())
         controller = StatusItemController(state: state)
         shortcuts = GlobalShortcuts(state: state)
     }

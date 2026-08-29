@@ -42,17 +42,21 @@ public final class CattClient: @unchecked Sendable {
         CattParser.parseStatus(try invoke(["-d", device, "status"]))
     }
 
-    public func cast(_ url: String, kind: CastKind, device: String) throws {
-        let flags: [String]
+    public func cast(_ url: String, kind: CastKind, device: String,
+                     seekTo: TimeInterval? = nil) throws {
+        var opts: [String] = []
         switch kind {
         case .directMedia:
-            flags = ["cast", "-f", url]
+            opts.append("-f")
         case .youtube, .extractableSite:
-            flags = ["cast", url]
+            break
         case .notCastable(let reason):
             throw CattError(reason)
         }
-        _ = try invoke(["-d", device] + flags)
+        if let seekTo, seekTo >= 1 {
+            opts += ["-t", String(Int(seekTo.rounded()))]
+        }
+        _ = try invoke(["-d", device, "cast"] + opts + [url])
     }
 
     public func setVolume(_ level: Int, device: String) throws {
