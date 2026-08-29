@@ -2,3 +2,8 @@
 .build/
 DerivedData/
 *.xcuserstate
+.DS_Store
+.build-atv/
+.vscode/
+build/dist/
+build/Fling-Install.zip
