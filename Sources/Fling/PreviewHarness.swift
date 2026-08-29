@@ -68,6 +68,27 @@ enum PreviewHarness {
             $0.applyTVRemote(paired: true, isOn: true, currentApp: "com.netflix.ninja")
         }
 
+        // FLING_PREVIEW=hero renders just the two showcase panels, unlabelled,
+        // for the README screenshot.
+        if ProcessInfo.processInfo.environment["FLING_PREVIEW"] == "hero" {
+            let hero = HStack(alignment: .top, spacing: 26) {
+                labelled("", casting)
+                labelled("", remotePaired, page: .remote)
+            }
+            .padding(30)
+            .background(Color(nsColor: .windowBackgroundColor))
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 640, height: 780),
+                styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            window.title = "Fling — panel states"
+            window.contentView = NSHostingView(rootView: hero)
+            window.center()
+            window.makeKeyAndOrderFront(nil)
+            app.activate(ignoringOtherApps: true)
+            app.run()
+            return
+        }
+
         // Two rows of three — six panels in one row is wider than a 1512pt
         // laptop display, and the last column gets clipped out of screenshots.
         let root = VStack(alignment: .leading, spacing: 22) {
