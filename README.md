@@ -77,6 +77,13 @@ controls (active while the panel is open):
 | ← / → | Back / forward 30 seconds |
 | ⌘. | Stop casting |
 
+**Resume where you left off** — when the page is mid-video, the cast row
+becomes "Resume on TV at 12:34" and playback starts there. Fling reads the
+page's actual player (and its stream, for sites yt-dlp can't crack) through a
+one-time browser toggle: Chrome **View ▸ Developer ▸ Allow JavaScript from
+Apple Events**, Safari **Develop ▸ Allow JavaScript from Apple Events**. The
+panel shows a hint until it's on; casting works without it either way.
+
 Both browsers installed? A Chrome/Safari picker sits at the top of the panel
 so you can cast from a browser that isn't frontmost.
 
@@ -116,6 +123,7 @@ menu appears when several are on the network. Pairing is per-TV.
 | Mic button does nothing | System Settings → Privacy & Security → Microphone → enable Fling. |
 | Panel says "Fling needs catt" | The Cast engine is missing — rerun the install one-liner, or use the panel's **Copy install command**. |
 | A normal article page won't cast | Expected — Chromecast plays media streams, not web pages. Open a video page. |
+| No "Resume on TV" even mid-video | Enable the browser's Allow JavaScript from Apple Events toggle (Chrome: View ▸ Developer; Safari: Develop menu). |
 
 ## Update / uninstall
 
