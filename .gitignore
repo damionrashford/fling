@@ -1,6 +1,5 @@
 # build products
-.build/
-.build-atv/
+.build*/
 build/
 DerivedData/
 *.xcuserstate
