@@ -1,0 +1,10 @@
+{
+  "name": "fling-cast",
+  "version": "1.0.0",
+  "description": "Menu bar caster + TV remote for Chromecast / Google TV on macOS",
+  "bin": { "fling-install": "Scripts/install.mjs" },
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "os": ["darwin"],
+  "repository": "github:damionrashford/fling"
+}

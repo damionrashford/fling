@@ -34,11 +34,18 @@ curl -fsSLO https://raw.githubusercontent.com/damionrashford/fling/main/Scripts/
 bash get-fling.sh
 ```
 
-The script pulls the universal binary straight from this repo, assembles the
-app in /Applications, installs the Cast engine
+Or, if you have Node or Bun installed, one command:
+
+```sh
+npx github:damionrashford/fling
+```
+
+Either way it pulls the universal binary straight from this repo, assembles
+the app in /Applications, installs the Cast engine
 ([catt](https://github.com/skorokithakis/catt) via
-[uv](https://docs.astral.sh/uv/)), and launches Fling. curl downloads carry no
-quarantine flag, so there is no Gatekeeper "Open Anyway" step.
+[uv](https://docs.astral.sh/uv/)), and launches Fling. These downloads carry
+no quarantine flag, so there is no Gatekeeper "Open Anyway" step. Re-run to
+update.
 
 **Requirements:** macOS 14+, and your Mac on the same Wi-Fi network as the TV.
 
