@@ -1,12 +1,7 @@
-import Foundation
-
 /// Drives the one-time pairing handshake on port 6467 (polo.proto), ported
-/// from androidtvremote2 pairing.py.
-///
-/// Call order: `start(host:)` — when it returns, the TV is showing a 6-hex-char
-/// PIN — then `finish(pin:)` with what the user read off the screen. The same
-/// instance must handle both calls: the secret is computed over the server
-/// certificate captured during `start`'s TLS handshake.
+/// from androidtvremote2 pairing.py. `start(host:)` returns once the TV shows
+/// its PIN; `finish(pin:)` must run on the same instance, because the secret
+/// is computed over the server certificate captured during `start`'s handshake.
 public actor ATVPairingClient {
 
     private let store: ATVCertificateStore
@@ -46,7 +41,7 @@ public actor ATVPairingClient {
     }
 
     /// Sends the secret derived from the on-screen PIN. On SecretAck the TV has
-    /// stored our certificate and port 6466 will accept it from now on.
+    /// stored the client certificate and port 6466 will accept it.
     public func finish(pin: String) async throws {
         guard let connection else { throw ATVError.pairingNotStarted }
         do {
@@ -72,8 +67,8 @@ public actor ATVPairingClient {
         connection = nil
     }
 
-    /// Any non-OK status is terminal — the reference closes the connection on
-    /// it (e.g. STATUS_BAD_SECRET 402 for a wrong PIN).
+    /// Any non-OK status is terminal and closes the connection (e.g.
+    /// STATUS_BAD_SECRET 402 for a wrong PIN).
     private func receive(on connection: ATVFramedConnection) async throws -> ATVPairingMessage.Inbound {
         let message = try await withATVDeadline(seconds: 30) {
             try await connection.receiveMessage()

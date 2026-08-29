@@ -1,9 +1,8 @@
 import SwiftUI
 import FlingKit
 
-/// The "Remote" page of the panel: everything that drives the TV itself —
-/// power, app launcher, d-pad, instant volume, and typing — over the Android
-/// TV Remote session. Casting stays on the "Cast" page.
+/// The "Remote" page: power, app launcher, d-pad, volume keys, and typing,
+/// all over the Android TV Remote session. Casting lives on the "Cast" page.
 struct RemoteView: View {
     @ObservedObject var state: AppState
     @State private var typed = ""

@@ -50,8 +50,7 @@ final class ThumbnailTests: XCTestCase {
                        "https://img.youtube.com/vi/gCcx85zbxz4/hqdefault.jpg")
     }
 
-    /// Rule 1 still holds for everything else — no thumbnail means the panel
-    /// reserves no space for one.
+    /// No thumbnail means the panel reserves no space for one.
     func test_non_youtube_tab_has_no_thumbnail() {
         let tab = TabRef(url: "https://news.ycombinator.com", title: "HN", browser: .chrome)
         XCTAssertNil(tab.thumbnailURL)

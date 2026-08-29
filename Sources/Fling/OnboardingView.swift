@@ -24,7 +24,7 @@ struct OnboardingView: View {
             }
 
             HStack(spacing: 8) {
-                // Re-probing is what triggers the system consent dialog per app.
+                // Re-probing is what raises the system consent dialog per app.
                 Button("Grant access") { Task { await onRecheck() } }
                 Button("Open Settings") { PermissionProbe.openAutomationSettings() }
             }

@@ -1,5 +1,3 @@
-import Foundation
-
 /// An app on the TV the panel can launch. `link` is the Android app-link the
 /// remote protocol opens; `package` is the Android package name the TV reports
 /// as the foreground app, used to label "Now: …".
@@ -18,7 +16,7 @@ public struct TVApp: Identifiable, Equatable, Sendable {
 public extension TVApp {
     /// The remote protocol has no "list installed apps" call, so the launcher
     /// is a curated catalog. Links follow the Home Assistant androidtv_remote
-    /// community lists; each one still needs a live-launch check per TV model.
+    /// community lists and are not verified per TV model.
     static let catalog: [TVApp] = [
         TVApp(name: "YouTube", link: "https://www.youtube.com",
               package: "com.google.android.youtube.tv"),

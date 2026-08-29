@@ -1,5 +1,3 @@
-import Foundation
-
 public struct DeviceInfo: Equatable, Hashable, Sendable, Identifiable {
     public let ip: String
     public let name: String

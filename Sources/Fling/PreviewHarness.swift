@@ -3,14 +3,11 @@ import SwiftUI
 import FlingKit
 
 /// Development-only. `Fling --preview-panel` renders every panel state in a
-/// normal window so the design can be screenshotted and compared against the
-/// mockups. The menu bar popover cannot be opened programmatically — driving an
-/// NSStatusItem through the Accessibility API hangs — so without this there is
-/// no way to look at the UI except by hand.
+/// normal window; the menu bar popover cannot be opened programmatically, so
+/// this is the only way to screenshot the design.
 enum PreviewHarness {
 
-    /// Returns "" for everything, so no subprocess is ever spawned and no
-    /// device on the network is contacted.
+    /// Returns "" for everything: no subprocess runs and no device is contacted.
     private struct StubRunner: ProcessRunning {
         func run(_ executable: String, _ args: [String]) throws -> String { "" }
     }
@@ -68,8 +65,7 @@ enum PreviewHarness {
             $0.applyTVRemote(paired: true, isOn: true, currentApp: "com.netflix.ninja")
         }
 
-        // FLING_PREVIEW=hero renders just the two showcase panels, unlabelled,
-        // for the README screenshot.
+        // FLING_PREVIEW=hero renders only the two showcase panels, unlabelled.
         if ProcessInfo.processInfo.environment["FLING_PREVIEW"] == "hero" {
             let hero = HStack(alignment: .top, spacing: 26) {
                 labelled("", casting)
@@ -89,8 +85,8 @@ enum PreviewHarness {
             return
         }
 
-        // Two rows of three — six panels in one row is wider than a 1512pt
-        // laptop display, and the last column gets clipped out of screenshots.
+        // Two rows of three: six panels in one row overflow a 1512pt display
+        // and the last column is clipped out of screenshots.
         let root = VStack(alignment: .leading, spacing: 22) {
             HStack(alignment: .top, spacing: 22) {
                 labelled("idle · castable", idleCastable)

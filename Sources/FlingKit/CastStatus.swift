@@ -24,11 +24,9 @@ public struct CastStatus: Equatable, Sendable {
     public let muted: Bool
     public let state: PlaybackState
 
-    /// Something is loaded on the device — playing OR paused. This is what
-    /// decides the casting panel; pausing must not drop back to idle.
-    ///
-    /// `catt` sometimes omits the `Time:` line mid-playback (observed live), so
-    /// an explicit state is trusted over the presence of timing data.
+    /// Loaded on the device, playing or paused — this decides the casting
+    /// panel. `catt` sometimes omits the `Time:` line mid-playback, so an
+    /// explicit state is trusted over the presence of timing data.
     public var hasMedia: Bool {
         switch state {
         case .playing, .paused, .buffering: return true

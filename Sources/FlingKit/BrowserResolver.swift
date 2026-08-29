@@ -1,5 +1,3 @@
-import Foundation
-
 public enum SourceChoice: Equatable, Sendable {
     case none
     case single(Browser)

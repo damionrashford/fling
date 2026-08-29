@@ -38,7 +38,7 @@ struct ContextMenuBuilder {
         menu.addItem(action("Back 30s", enabled: casting) { Task { await state.seek(by: -30) } })
         menu.addItem(action("Forward 30s", enabled: casting) { Task { await state.seek(by: 30) } })
 
-        // A native menu genuinely cannot hold a slider — presets instead.
+        // NSMenu cannot host a slider, so offer presets instead.
         menu.addItem(submenu("Volume — \(state.volume)%",
                              items: stride(from: 0, through: 100, by: 10).map { level in
             let item = action("\(level)%") { state.setVolume(level) }
@@ -85,7 +85,6 @@ struct ContextMenuBuilder {
         parent.submenu = sub
         return parent
     }
-
 }
 
 /// `NSMenuItem` needs an ObjC target; this carries a Swift closure to one.

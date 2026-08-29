@@ -47,9 +47,8 @@ public final class AppState: ObservableObject {
     private var refreshing = false
     private var volumeTask: Task<Void, Never>?
 
-    /// How long the volume slider settles before a command is sent. Dragging a
-    /// slider emits an event per pixel; without this, each one would spawn a
-    /// `catt` subprocess and hammer the TV.
+    /// How long the volume slider settles before a command is sent. Dragging
+    /// emits an event per pixel, and each one would spawn a `catt` subprocess.
     public static let volumeDebounce = Duration.milliseconds(180)
 
     public init(catt: CattClient?, browsers: BrowserReader, atv: AndroidTVRemote? = nil) {
@@ -81,8 +80,8 @@ public final class AppState: ObservableObject {
 
     // MARK: - state transitions
 
-    /// Pure setter for previews and tests — in production these values arrive
-    /// only from pairing and the remote session's event stream.
+    /// Setter for previews and tests. In production these values arrive only
+    /// from pairing and the remote session's event stream.
     public func applyTVRemote(paired: Bool, isOn: Bool?, currentApp: String?) {
         tvPaired = paired
         tvIsOn = isOn
@@ -111,8 +110,8 @@ public final class AppState: ObservableObject {
 
     // MARK: - refresh
 
-    /// Every call here is blocking subprocess I/O — `catt scan` alone takes about
-    /// ten seconds. It MUST run off the main actor, or the menu bar never draws.
+    /// Every call here is blocking subprocess I/O — `catt scan` alone takes
+    /// about ten seconds — so it must run off the main actor.
     public func refresh() async {
         guard let catt, !refreshing else { return }
         refreshing = true
@@ -163,8 +162,8 @@ public final class AppState: ObservableObject {
         activeBrowser = browser
         sourceChoice = .single(browser)
 
-        // Read the chosen browser directly. Going through refresh() would let
-        // frontmost-resolution override the explicit choice the user just made.
+        // Read the chosen browser directly: refresh() would let
+        // frontmost-resolution override the explicit choice.
         let reader = self.browsers
         let tab = await Task.detached(priority: .userInitiated) {
             try? reader.readTab(browser)
@@ -277,8 +276,8 @@ public final class AppState: ObservableObject {
             let capture = VoiceCapture()
             let (chunks, feed) = AsyncStream<Data>.makeStream()
             try capture.start { feed.yield($0) }
-            // A single consumer keeps chunks in utterance order — firing a
-            // Task per chunk would let them interleave.
+            // A single consumer keeps chunks in utterance order; a Task per
+            // chunk would let them interleave.
             voiceSendTask = Task {
                 for await chunk in chunks { try? await atv.sendVoice(pcm: chunk) }
             }
@@ -309,9 +308,8 @@ public final class AppState: ObservableObject {
         tvPaired = atv.hasPairing(host: host)
     }
 
-    /// Counterpart of `send` for the remote-protocol session: resolves the
-    /// host, ensures the event stream is being consumed, and routes failures
-    /// into `lastError`.
+    /// Counterpart of `send` for the remote session: resolves the host, starts
+    /// consuming the event stream, and routes failures into `lastError`.
     private func sendATV(_ body: (AndroidTVRemote, String) async throws -> Void) async {
         guard let atv else { return }
         guard let host = selectedDevice?.ip else { lastError = "No device selected"; return }
@@ -325,7 +323,7 @@ public final class AppState: ObservableObject {
     }
 
     /// The TV pushes power flips over the open session; without this the row
-    /// label would only update after our own toggles.
+    /// label would update only after a toggle sent from here.
     private func watchATVEvents() {
         guard atvEvents == nil, let atv else { return }
         atvEvents = Task { [weak self] in
@@ -352,15 +350,13 @@ public final class AppState: ObservableObject {
             return "Couldn't reach the TV. If this keeps happening, re-run TV power setup."
         case ATVError.notPaired, ATVError.pairingNotStarted:
             return "Run TV power setup first."
-        case let e as CattError:
-            return e.message
         default:
             return error.localizedDescription
         }
     }
 
-    /// Updates the slider immediately and sends the command once dragging settles.
-    /// Sync on purpose — the UI binding must not await.
+    /// Updates the slider immediately and sends the command once dragging
+    /// settles. Synchronous because the UI binding must not await.
     public func setVolume(_ level: Int) {
         volume = min(100, max(0, level))
         let target = volume

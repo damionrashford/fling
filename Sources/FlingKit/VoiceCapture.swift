@@ -5,9 +5,8 @@ public enum VoiceCaptureError: Error {
 }
 
 /// Captures the Mac microphone in the format the Android TV voice channel
-/// requires: 16-bit PCM, mono, 8 kHz. Chunks are emitted at exactly 8 KB so
-/// the transport never has to zero-pad mid-utterance — padding is only ever
-/// applied to the final partial chunk returned by `stop()`.
+/// requires: 16-bit PCM, mono, 8 kHz. Chunks are emitted at exactly 8 KB, so
+/// only the tail returned by `stop()` is ever zero-padded by the transport.
 public final class VoiceCapture {
 
     /// The transport's minimum payload size; anything smaller gets zero-padded.
@@ -20,9 +19,8 @@ public final class VoiceCapture {
 
     public init() {}
 
-    /// The first call prompts for microphone permission (the bundle carries
-    /// NSMicrophoneUsageDescription); a denial surfaces as the engine failing
-    /// to deliver audio, not as a throw.
+    /// The first call prompts for microphone permission; a denial surfaces as
+    /// the engine failing to deliver audio, not as a throw.
     public func start(onChunk: @escaping @Sendable (Data) -> Void) throws {
         let input = engine.inputNode
         let native = input.outputFormat(forBus: 0)

@@ -2,7 +2,7 @@ import XCTest
 @testable import FlingKit
 
 /// Requires real browsers. Skips rather than fails when one is not running,
-/// so the suite stays green in CI, but MUST be run manually with both open.
+/// so it proves nothing unless run manually with both browsers open.
 final class LiveBrowserTests: XCTestCase {
 
     func test_live_chrome_tab_read() throws {
@@ -13,9 +13,8 @@ final class LiveBrowserTests: XCTestCase {
         try readAndReport(.safari)
     }
 
-    /// A browser that is running with no windows is a valid state the app
-    /// handles, not a test failure — skip it rather than reporting red, but
-    /// let any other error through so a real regression still fails loudly.
+    /// Running with no windows is a state the app handles, so skip it; any
+    /// other error is let through so a real regression still fails.
     private func readAndReport(_ browser: Browser) throws {
         let reader = BrowserReader()
         try XCTSkipUnless(reader.isRunning(browser), "\(browser.displayName) not running")

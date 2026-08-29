@@ -1,9 +1,9 @@
 import XCTest
 @testable import FlingKit
 
-/// Shared fake used by CattClient, BrowserSource, AppState, and PermissionProbe tests.
-/// `@unchecked Sendable` because AppState hands its client to detached tasks;
-/// tests drive it sequentially and read `calls` only after awaiting.
+/// Shared fake used across the FlingKit tests. `@unchecked Sendable` because
+/// AppState hands its client to detached tasks; tests drive it sequentially
+/// and read `calls` only after awaiting.
 final class FakeRunner: ProcessRunning, @unchecked Sendable {
     var calls: [(exe: String, args: [String])] = []
     var stubbedOutput = ""
@@ -30,8 +30,7 @@ final class CattClientTests: XCTestCase {
         XCTAssertEqual(r.calls[0].args, ["scan"])
     }
 
-    // The -f flag is load-bearing: without it catt pipes the URL through yt-dlp,
-    // which 403s on plain .mp4 files. Observed live 2026-08-25.
+    // Without -f, catt pipes the URL through yt-dlp, which 403s on plain .mp4.
     func test_direct_media_uses_force_default_flag() throws {
         let r = FakeRunner()
         try client(r).cast("https://ex.com/a.mp4", kind: .directMedia, device: "Living room TV")
@@ -124,8 +123,8 @@ final class CattClientTests: XCTestCase {
                                  ["-d", "TV", "stop"]])
     }
 
-    // The TCL acks DashCast launches after pychromecast's 10 s wait expires,
-    // so a launch "timeout" must not abort the wake.
+    // DashCast can ack a launch after pychromecast's 10 s wait expires, so a
+    // launch timeout must not abort the wake.
     func test_wake_tolerates_launch_timeout_when_stop_succeeds() throws {
         let r = SequencedRunner(outputs: [
             "pychromecast.error.RequestTimeout: Execution of start app 84912283 timed out after 10.0 s.",

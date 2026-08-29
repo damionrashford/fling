@@ -1,6 +1,6 @@
 import Foundation
 
-/// `@unchecked Sendable` for the same reason as `CattClient` — immutable, and
+/// `@unchecked Sendable` for the same reason as `CattClient`: immutable, and
 /// used from detached tasks so `osascript` never blocks the main actor.
 public struct BrowserReader: @unchecked Sendable {
     private let jxa: JXARunner
@@ -9,8 +9,8 @@ public struct BrowserReader: @unchecked Sendable {
         self.jxa = JXARunner(runner: runner)
     }
 
-    /// Asked via System Events so the browser is never launched as a side effect
-    /// of the check — addressing the app directly would start it.
+    /// Asked via System Events so the check never launches the browser;
+    /// addressing the app directly would start it.
     public func isRunning(_ browser: Browser) -> Bool {
         let script = """
         Application("System Events").processes.whose({name: "\(browser.processName)"}).length > 0

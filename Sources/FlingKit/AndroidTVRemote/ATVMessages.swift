@@ -1,7 +1,6 @@
 import Foundation
 
-/// Android keycodes from remotemessage.proto's RemoteKeyCode enum — only the
-/// handful a TV remote surface actually needs.
+/// Android keycodes from remotemessage.proto's RemoteKeyCode enum.
 public enum ATVKeyCode {
     public static let power: Int32 = 26
     public static let home: Int32 = 3
@@ -138,9 +137,8 @@ enum ATVRemoteMessage {
         /// (RemoteImeKeyInject) and accepts text entry (RemoteImeBatchEdit).
         static let requested: Features = [.ping, .key, .ime, .power, .volume, .appLink]
 
-        /// Voice is opt-in (matching the reference's `enable_voice=False`
-        /// default): with it negotiated, KEYCODE_SEARCH puts the TV into
-        /// mic-listening mode, which would break plain typed search.
+        /// Voice is opt-in: once negotiated, KEYCODE_SEARCH puts the TV into
+        /// mic-listening mode, which breaks typed search.
         static let requestedWithVoice: Features = requested.union(.voice)
 
         static func requested(voice: Bool) -> Features {
@@ -179,8 +177,7 @@ enum ATVRemoteMessage {
     static let voiceChunkSize = 20 * 1024
 
     /// The reply half of the RemoteConfigure exchange. Identity strings match
-    /// what remote.py sends; the TV displays none of them but rejects an empty
-    /// configure.
+    /// remote.py; the TV displays none of them but rejects an empty configure.
     static func configureReply(features: Features) -> Data {
         var w = ProtoWriter()
         w.message(Field.remoteConfigure) { c in
@@ -230,11 +227,10 @@ enum ATVRemoteMessage {
     }
 
     /// Text entry via the IME (remote.py `send_text`): a single-insert batch
-    /// edit carrying the caller's counters. `start`/`end` are `len - 1`, which
-    /// is where the reference puts the cursor.
+    /// edit carrying the caller's counters. `start`/`end` are `len - 1`, where
+    /// the reference puts the cursor.
     static func imeBatchEdit(text: String, imeCounter: UInt64, fieldCounter: UInt64) -> Data {
-        // Python `len(str)` counts Unicode scalars, so match that, not grapheme
-        // clusters, for the cursor offset.
+        // Python `len(str)` counts Unicode scalars, not grapheme clusters.
         let cursor = UInt64(max(0, text.unicodeScalars.count - 1))
         var w = ProtoWriter()
         w.message(Field.remoteImeBatchEdit) { b in
@@ -279,7 +275,7 @@ enum ATVRemoteMessage {
         var hasSetActive = false
         /// RemotePingRequest.val1, echoed back in the response.
         var pingVal1: UInt64?
-        /// RemoteStart.started — the TV's power state; false arrives as an
+        /// RemoteStart.started — the TV's power state. False arrives as an
         /// empty submessage because proto3 omits zero scalars.
         var started: Bool?
         var hasError = false
@@ -311,8 +307,8 @@ enum ATVRemoteMessage {
         }
         if let imeKey = try reader.message(Field.remoteImeKeyInject),
            let appInfo = try imeKey.message(1) {
-            // Raw package, "" included, so callers can tell "app closed" (empty)
-            // apart from "no report" (field absent).
+            // Raw package, "" included, so callers can tell "app closed"
+            // (empty) from "no report" (field absent).
             msg.currentApp = try appInfo.string(12) ?? ""
         }
         if let batch = try reader.message(Field.remoteImeBatchEdit) {

@@ -1,10 +1,8 @@
 import XCTest
 @testable import FlingKit
 
-/// Live output from the device on 2026-08-25 included a `State:` line the
-/// original parser ignored, so a paused video still reported isPlaying == true.
-/// Worse, AppState used isPlaying to decide the casting panel state, so pausing
-/// would have knocked the panel back to idle.
+/// `catt status` carries a `State:` line; a paused video must not read as
+/// playing, and must not knock the panel back to idle.
 final class PlaybackStateTests: XCTestCase {
 
     private let playing = """
@@ -40,8 +38,7 @@ final class PlaybackStateTests: XCTestCase {
         XCTAssertTrue(CattParser.parseStatus(playing).isPlaying)
     }
 
-    /// Paused is still *casting* — the panel must not fall back to idle just
-    /// because playback is stopped.
+    /// Paused is still casting; the panel must not fall back to idle.
     func test_paused_media_still_counts_as_having_media() {
         XCTAssertTrue(CattParser.parseStatus(paused).hasMedia)
     }
@@ -86,8 +83,8 @@ final class PausedPanelStateTests: XCTestCase {
     }
 }
 
-/// Captured live 2026-08-25: catt sometimes omits the Time line while playback
-/// is genuinely active. Requiring elapsed made the panel drop to idle mid-play.
+/// `catt` sometimes omits the `Time:` line while playback is active, so
+/// elapsed time cannot be required to conclude something is casting.
 final class MissingTimeLineTests: XCTestCase {
 
     private let noTimeLine = """

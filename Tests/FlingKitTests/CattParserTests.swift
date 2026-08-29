@@ -40,7 +40,7 @@ final class CattParserTests: XCTestCase {
         XCTAssertEqual(s.duration, 7200)
     }
 
-    // Volume-only output happens when nothing is playing — observed live.
+    // Volume-only output is what catt prints when nothing is playing.
     func test_volume_only_output_has_no_title() {
         let s = CattParser.parseStatus("Volume: 30\nVolume muted: False")
         XCTAssertNil(s.title)

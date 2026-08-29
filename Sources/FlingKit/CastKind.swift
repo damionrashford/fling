@@ -1,5 +1,3 @@
-import Foundation
-
 /// How a given URL must be handed to the Cast device.
 public enum CastKind: Equatable, Sendable {
     /// A direct media file or manifest. MUST be cast with `catt cast -f`.

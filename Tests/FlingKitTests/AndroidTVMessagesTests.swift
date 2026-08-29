@@ -74,8 +74,8 @@ final class AndroidTVRemoteMessageTests: XCTestCase {
 
     func test_requested_features_value() {
         // PING(1) | KEY(2) | IME(4) | POWER(32) | VOLUME(64) | APP_LINK(512) = 615.
-        // IME is now negotiated so the TV reports the foreground app and accepts
-        // text; VOICE stays off by default.
+        // IME is negotiated so the TV reports the foreground app and accepts
+        // text; VOICE is off by default.
         XCTAssertEqual(ATVRemoteMessage.Features.requested.rawValue, 615)
     }
 

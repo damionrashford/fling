@@ -6,8 +6,8 @@ enum PanelPage { case cast, remote }
 
 struct PanelView: View {
     @ObservedObject var state: AppState
-    /// Off in the preview harness — probing spawns osascript and would trigger
-    /// real consent dialogs just to look at the design.
+    /// Off in the preview harness: probing spawns osascript and triggers real
+    /// consent dialogs.
     var probesPermissions = true
     @State private var missingGrants: [Browser] = []
     @State private var page: PanelPage
@@ -29,8 +29,7 @@ struct PanelView: View {
                     case .cast:   castPage
                     case .remote: RemoteView(state: state)
                     }
-                    // Shared chrome — rule 3 holds on both pages: the device
-                    // footer never moves.
+                    // Shared chrome: the device footer is the last row of both pages.
                     Separator()
                     housekeeping
                     DeviceFooter(state: state)
@@ -80,13 +79,10 @@ struct PanelView: View {
 
     private func idle(reason: String?) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Shown whenever both browsers are installed, so a closed browser is
-            // still reachable.
             if state.installedBrowsers.count > 1 {
                 SourcePicker(state: state, options: state.installedBrowsers)
             }
 
-            // Only when the URL actually yields a preview image.
             if let thumb = state.tab?.thumbnailURL {
                 Artwork(url: thumb).padding(.top, 8)
             }
@@ -111,7 +107,7 @@ struct PanelView: View {
 
             Separator()
 
-            // Rule 4 — the only accented row. Rule 5 — stays visible when disabled.
+            // The only accented row, and it stays visible when disabled.
             MenuRow(title: "Cast this tab", shortcut: "⌘⇧C",
                     accented: reason == nil, enabled: reason == nil) {
                 Task { await state.castCurrentTab() }
@@ -121,11 +117,11 @@ struct PanelView: View {
             MenuRow(title: "Cast clipboard URL") { Task { await state.castClipboard() } }
 
             Separator()
-            VolumeRow(state: state)          // Rule 2
+            VolumeRow(state: state)          // same slot in every state
         }
     }
 
-    /// Above the device footer, so rule 3 still holds — the device never moves.
+    /// Sits above the device footer, which is always the last row.
     private var housekeeping: some View {
         VStack(alignment: .leading, spacing: 0) {
             MenuRow(title: LoginItem.isEnabled ? "✓ Open at Login" : "Open at Login") {
@@ -172,7 +168,7 @@ struct PanelView: View {
             MenuRow(title: "Back 30s", shortcut: "←") { Task { await state.seek(by: -30) } }
             MenuRow(title: "Forward 30s", shortcut: "→") { Task { await state.seek(by: 30) } }
 
-            VolumeRow(state: state)          // Rule 2 — same slot as idle
+            VolumeRow(state: state)          // same slot as idle
 
             Separator()
             MenuRow(title: "Cast this tab instead", shortcut: "⌘⇧C") {
@@ -184,7 +180,7 @@ struct PanelView: View {
 
     private var artwork: some View { Artwork(url: state.tab?.thumbnailURL) }
 
-    // Rule 5 — the failure explains itself where it happened.
+    // The failure explains itself in place, next to the row that is disabled.
     private func inlineWhy(_ reason: String) -> some View {
         Text(explanation(for: reason))
             .font(.system(size: 11))

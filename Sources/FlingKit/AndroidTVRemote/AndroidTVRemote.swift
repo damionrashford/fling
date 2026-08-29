@@ -25,13 +25,8 @@ public enum ATVError: Error, Equatable {
 }
 
 /// App-facing facade over the Android TV Remote protocol v2 client: one-time
-/// pairing (port 6467) and the power/key session (port 6466).
-///
-/// Pairing call order for the UI:
-///   1. `hasPairing(host:)` — false means run pairing first.
-///   2. `startPairing(host:)` — returns when the TV is showing the PIN.
-///   3. `finishPairing(pin:)` — with the PIN the user typed; records the host.
-///   4. Thereafter `togglePower(host:)` connects on demand and toggles.
+/// pairing on port 6467, then the power/key session on port 6466. Call order
+/// is `hasPairing`, `startPairing`, `finishPairing`, then any session method.
 public actor AndroidTVRemote {
 
     public let store: ATVCertificateStore
@@ -42,8 +37,8 @@ public actor AndroidTVRemote {
     private var lastHost: String?
 
     /// `enableVoice` negotiates the VOICE feature so `beginVoice`/`sendVoice`
-    /// work. It is off by default because, once negotiated, KEYCODE_SEARCH puts
-    /// the TV into mic-listening mode instead of opening plain typed search.
+    /// work. Off by default: once negotiated, KEYCODE_SEARCH puts the TV into
+    /// mic-listening mode instead of opening typed search.
     public init(clientName: String = "Fling",
                 store: ATVCertificateStore = .shared,
                 enableVoice: Bool = false) {
@@ -54,8 +49,8 @@ public actor AndroidTVRemote {
 
     // MARK: - pairing
 
-    /// Client-side record only: the identity exists and this host acked our
-    /// secret once. The TV clearing its side shows up as a TLS failure on
+    /// Client-side record only: the identity exists and this host acked the
+    /// secret once. The TV clearing its side surfaces as a TLS failure on
     /// `connect`, which is the signal to re-pair.
     public nonisolated func hasPairing(host: String) -> Bool {
         store.identityExists && store.pairedHosts().contains(host)
@@ -92,23 +87,9 @@ public actor AndroidTVRemote {
         try await remote.connect(host: host)
     }
 
-    public func disconnect() async {
-        await remote.disconnect()
-    }
-
-    public var isConnected: Bool {
-        get async { await remote.isConnected }
-    }
-
     /// Power state from the TV's last RemoteStart; meaningful once connected.
     public var isOn: Bool {
         get async { await remote.isOn }
-    }
-
-    /// Foreground app package reported by the TV over the session, nil if
-    /// unknown or the launcher is showing.
-    public var currentApp: String? {
-        get async { await remote.currentApp }
     }
 
     /// Toggles power, connecting first if needed. Pass `host` on the first call;
@@ -124,15 +105,15 @@ public actor AndroidTVRemote {
         try await remote.sendKey(code)
     }
 
-    /// Launches an app, connecting on demand. A bare app id (no URL scheme) is
-    /// turned into a `market://launch?id=…` link, matching the reference.
+    /// Launches an app, connecting on demand. A bare app id (no URL scheme)
+    /// becomes a `market://launch?id=…` link.
     public func launchApp(link: String, host: String? = nil) async throws {
         try await ensureConnected(host: host)
         try await remote.launchApp(link: Self.normalizeAppLink(link))
     }
 
-    /// Commits text via the IME, connecting on demand. See the type docs: this
-    /// only lands when a text field is focused on the TV.
+    /// Commits text via the IME, connecting on demand. Only lands when a text
+    /// field is focused on the TV.
     public func sendText(_ text: String, host: String? = nil) async throws {
         try await ensureConnected(host: host)
         try await remote.sendText(text)

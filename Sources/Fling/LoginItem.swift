@@ -1,8 +1,6 @@
 import AppKit
 import ServiceManagement
 
-/// Shared by the panel and the right-click menu so the two surfaces can never
-/// disagree about whether Fling launches at login.
 @MainActor
 enum LoginItem {
     static var isEnabled: Bool { SMAppService.mainApp.status == .enabled }

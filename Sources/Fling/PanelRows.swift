@@ -3,8 +3,8 @@ import FlingKit
 
 // MARK: - primitives
 
-/// SwiftUI's `Divider()` renders almost invisibly on the popover's material,
-/// which read as "no separation at all". This draws an explicit hairline.
+/// `Divider()` renders almost invisibly on the popover's material, so this
+/// draws an explicit hairline instead.
 struct Separator: View {
     var body: some View {
         Rectangle()
@@ -15,7 +15,7 @@ struct Separator: View {
     }
 }
 
-/// 3pt track, 11pt knob — the stock `Slider` is far too heavy for a menu panel.
+/// 3pt track, 11pt knob — the stock `Slider` is too heavy for a menu panel.
 struct SlimSlider: View {
     @Binding var value: Double
     var range: ClosedRange<Double> = 0...100
@@ -138,7 +138,7 @@ struct MenuRow: View {
     }
 }
 
-/// Rule 2: this row occupies the same slot in every state.
+/// Occupies the same slot in every panel state.
 struct VolumeRow: View {
     @ObservedObject var state: AppState
 
@@ -164,9 +164,8 @@ struct VolumeRow: View {
     }
 }
 
-/// Top-level page switch. Underline style on purpose — the SourcePicker below
-/// it already uses filled chips, and two adjacent chip rows read as one
-/// control.
+/// Top-level page switch. Underlined rather than chipped: the SourcePicker
+/// below already uses filled chips, and two chip rows read as one control.
 struct PagePicker: View {
     @Binding var page: PanelPage
 
@@ -240,7 +239,7 @@ struct TVPinEntry: View {
     }
 }
 
-/// Rule 3: always the footer, never moves.
+/// Always the last row of the panel, in every state.
 struct DeviceFooter: View {
     @ObservedObject var state: AppState
 
@@ -270,9 +269,8 @@ struct DeviceFooter: View {
     }
 }
 
-/// Shown whenever more than one supported browser is installed — running or
-/// not. Keying it off "running" made it vanish exactly when it was needed to
-/// reach a browser with no windows open.
+/// Shown whenever more than one supported browser is installed, running or
+/// not, so a browser with no windows open stays reachable.
 struct SourcePicker: View {
     @ObservedObject var state: AppState
     let options: [Browser]

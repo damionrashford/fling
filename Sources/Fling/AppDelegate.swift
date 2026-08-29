@@ -9,8 +9,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let catt = CattClient.resolveExecutable().map {
             CattClient(executable: $0, runner: SystemProcessRunner())
         }
-        // Voice on: KEYCODE_SEARCH becomes mic-listening on the TV, and the
-        // panel's mic button feeds it. Typed search still works via IME text.
+        // With voice negotiated, KEYCODE_SEARCH puts the TV into mic-listening
+        // mode; typed search still works through IME text.
         let state = AppState(catt: catt, browsers: BrowserReader(),
                              atv: AndroidTVRemote(enableVoice: true))
         controller = StatusItemController(state: state)

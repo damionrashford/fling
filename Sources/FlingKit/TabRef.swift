@@ -6,9 +6,9 @@ public enum Browser: String, CaseIterable, Sendable, Identifiable {
 
     public var id: String { rawValue }
 
-    /// Present on this Mac at all — independent of whether it is running or has
-    /// windows. The source picker keys off this so it never becomes a dead end
-    /// you cannot use to reach a closed browser.
+    /// Present on this Mac, independent of whether it is running or has
+    /// windows. The source picker keys off this so a closed browser stays
+    /// reachable.
     public static var installed: [Browser] {
         allCases.filter {
             NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0.bundleIdentifier) != nil
@@ -36,9 +36,8 @@ public enum Browser: String, CaseIterable, Sendable, Identifiable {
         }
     }
 
-    /// Verified against the on-disk scripting dictionaries.
-    /// Chrome: window has `active tab`; tab has `URL` and `title`.
-    /// Safari: window has `current tab`; tab has `URL` and `name`.
+    /// Per the on-disk scripting dictionaries: Chrome's window has `active
+    /// tab` with `URL`/`title`; Safari's has `current tab` with `URL`/`name`.
     var tabSnippet: String {
         switch self {
         case .chrome:
@@ -69,8 +68,8 @@ public struct TabRef: Equatable, Sendable {
     public let browser: Browser
     public let kind: CastKind
 
-    /// A real preview image when one can be derived from the URL alone. Nil for
-    /// everything else, so the panel reserves no space it cannot fill.
+    /// A preview image when one can be derived from the URL alone; nil
+    /// otherwise, so the panel reserves no space it cannot fill.
     public var thumbnailURL: URL? {
         guard let id = URLClassifier.youTubeVideoID(url) else { return nil }
         return URL(string: "https://img.youtube.com/vi/\(id)/hqdefault.jpg")
@@ -86,7 +85,6 @@ public struct TabRef: Equatable, Sendable {
 
 public enum BrowserError: Error, Equatable {
     case noWindows(Browser)
-    case notRunning(Browser)
     case permissionDenied(Browser)
     case unreadable(Browser, String)
 }

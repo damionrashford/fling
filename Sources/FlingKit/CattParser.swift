@@ -41,8 +41,8 @@ public enum CattParser {
             let l = line.trimmingCharacters(in: .whitespaces)
             guard !l.isEmpty, !l.hasPrefix("Scanning") else { return nil }
 
-            // Format: "<ip> - <name> - <model>". The name may itself contain " - ",
-            // so split off the first and last fields and rejoin the middle.
+            // Format: "<ip> - <name> - <model>". The name may itself contain
+            // " - ", so take the first and last fields and rejoin the middle.
             let parts = l.components(separatedBy: " - ")
             guard parts.count >= 3 else { return nil }
             let ip = parts[0]

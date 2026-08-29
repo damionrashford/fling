@@ -19,8 +19,8 @@ final class AndroidTVAppLaunchTests: XCTestCase {
             ATVTestHex.data("d205260a246d61726b65743a2f2f6c61756e63683f69643d636f6d2e6e6574666c69782e6e696e6a61"))
     }
 
-    // The facade turns a bare package id into a Play Store link, matching
-    // androidtv_remote.py send_launch_app_command.
+    // The facade turns a bare package id into a Play Store link
+    // (androidtv_remote.py send_launch_app_command).
     func test_normalize_bare_package_id() {
         XCTAssertEqual(AndroidTVRemote.normalizeAppLink("com.netflix.ninja"),
                        "market://launch?id=com.netflix.ninja")

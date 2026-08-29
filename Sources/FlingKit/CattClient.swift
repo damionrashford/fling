@@ -5,9 +5,9 @@ public struct CattError: Error, Equatable {
     public init(_ message: String) { self.message = message }
 }
 
-/// `@unchecked Sendable`: both stored properties are `let`, and the production
-/// runner (`SystemProcessRunner`) is a stateless struct. Instances are handed to
-/// detached tasks so blocking subprocess calls stay off the main actor.
+/// `@unchecked Sendable`: both stored properties are `let` and the production
+/// runner is a stateless struct. Instances are handed to detached tasks so
+/// blocking subprocess calls stay off the main actor.
 public final class CattClient: @unchecked Sendable {
     private let executable: String
     private let runner: ProcessRunning
@@ -17,8 +17,8 @@ public final class CattClient: @unchecked Sendable {
         self.runner = runner
     }
 
-    /// GUI apps do not inherit the shell's PATH, so the uv tool location is
-    /// checked explicitly before falling back to a PATH lookup.
+    /// GUI apps do not inherit the shell's PATH, so the known install
+    /// locations are probed explicitly.
     public static func resolveExecutable() -> String? {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let candidates = [
@@ -69,13 +69,10 @@ public final class CattClient: @unchecked Sendable {
         _ = try invoke(["-d", device, verb, String(abs(seconds))])
     }
 
-    /// Powers the TV screen on. The cast protocol has no power command, but
-    /// launching any receiver app makes the TV fire HDMI-CEC "One Touch Play",
-    /// which wakes the panel. The launch step's outcome is ignored on purpose:
-    /// DashCast's launch ack regularly outlives pychromecast's 10 s wait even
-    /// though the app comes up (observed live on the TCL, 2026-08-28). The
-    /// follow-up `stop` is the real signal — it confirms the TV answered and
-    /// returns it to the home screen instead of a blank DashCast page.
+    /// Powers the TV screen on: the cast protocol has no power command, but
+    /// launching a receiver app fires HDMI-CEC "One Touch Play". The launch
+    /// result is ignored because DashCast's ack can outlive pychromecast's
+    /// 10 s wait; the follow-up `stop` is the signal the TV answered.
     public func wake(device: String, settle: TimeInterval = 1.0) throws {
         _ = try? invoke(["-d", device, "cast_site", "https://example.com"])
         Thread.sleep(forTimeInterval: settle)

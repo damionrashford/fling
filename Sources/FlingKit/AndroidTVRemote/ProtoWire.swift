@@ -10,9 +10,9 @@ enum ProtoWireError: Error, Equatable {
     case malformedUTF8
 }
 
-/// Minimal protobuf wire codec. The Android TV remote protocol needs exactly two
-/// small schemas (polo.proto, remotemessage.proto), so a hand-rolled codec keeps
-/// SwiftProtobuf out of the dependency graph.
+/// Minimal protobuf wire codec. The protocol needs only two small schemas
+/// (polo.proto, remotemessage.proto), so hand-rolling keeps SwiftProtobuf out
+/// of the dependency graph.
 enum ProtoWire {
 
     static func varint(_ value: UInt64) -> [UInt8] {
@@ -47,9 +47,8 @@ enum ProtoWire {
     }
 }
 
-/// Appends fields in call order; callers write in ascending field number to
-/// match what python-protobuf (the reference implementation) emits, so golden
-/// byte tests stay comparable.
+/// Appends fields in call order. Callers write in ascending field number to
+/// match python-protobuf's output, keeping golden byte tests comparable.
 struct ProtoWriter {
     private(set) var bytes: [UInt8] = []
 
@@ -92,8 +91,8 @@ enum ProtoFieldValue: Equatable {
     case fixed64(UInt64)
 }
 
-/// Eagerly parses a message into (field, value) pairs. The schemas involved are
-/// a handful of fields each, so no lazy scanning is warranted.
+/// Eagerly parses a message into (field, value) pairs; the schemas are a
+/// handful of fields each, so lazy scanning is not warranted.
 struct ProtoReader {
     let fields: [(number: Int, value: ProtoFieldValue)]
 
@@ -170,7 +169,7 @@ struct ProtoReader {
 /// prefix (androidtvremote2 base.py).
 enum ProtoFrame {
     /// Remote messages are tens of bytes; anything past this is a corrupt
-    /// stream, and buffering it would just defer the failure.
+    /// stream, and buffering it would only defer the failure.
     static let maxLength: UInt64 = 1 << 20
 
     static func encode(_ message: Data) -> Data {

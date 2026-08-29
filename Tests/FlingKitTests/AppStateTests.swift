@@ -72,8 +72,8 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(r.calls.last?.args, ["-d", "TV", "volume", "70"])
     }
 
-    /// Regression guard: dragging the slider emits an event per pixel. Without
-    /// debouncing, each one spawned a `catt` subprocess and hammered the TV.
+    /// Dragging the slider emits an event per pixel; without debouncing each
+    /// one spawns a `catt` subprocess.
     func test_rapid_volume_changes_collapse_to_a_single_command() async {
         let r = FakeRunner()
         let state = makeState(r)
@@ -117,9 +117,8 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(r.calls.isEmpty)
     }
 
-    /// The bug that hid the menu bar icon: `refresh()` performed blocking
-    /// subprocess I/O synchronously on the main actor, so the run loop never
-    /// drew the status item. It must now complete without wedging the caller.
+    /// `refresh()` must run its blocking subprocess I/O off the main actor, or
+    /// the run loop never draws the status item.
     func test_refresh_completes_without_blocking_the_main_actor() async {
         let r = FakeRunner()
         r.stubbedOutput = "Volume: 50\nVolume muted: False"

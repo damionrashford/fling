@@ -23,9 +23,8 @@ public struct ATVRSAPublicNumbers: Equatable, Sendable {
 }
 
 /// One client identity for all Android TVs: a self-signed RSA-2048 certificate
-/// generated once and kept as a PKCS#12 under Application Support. Generation
-/// shells out to /usr/bin/openssl (LibreSSL) — the app already drives CLIs, and
-/// LibreSSL's pkcs12 default ciphers are the legacy set SecPKCS12Import accepts.
+/// kept as a PKCS#12 under Application Support. Generation shells out to
+/// LibreSSL, whose pkcs12 default ciphers are what SecPKCS12Import accepts.
 public final class ATVCertificateStore: @unchecked Sendable {
 
     public static let defaultDirectory = FileManager.default
@@ -79,8 +78,8 @@ public final class ATVCertificateStore: @unchecked Sendable {
         return identity
     }
 
-    /// The client cert's RSA numbers, needed for the pairing-secret hash.
-    /// Read from the DER kept next to the .p12 so no keychain round-trip is needed.
+    /// The client cert's RSA numbers, needed for the pairing-secret hash. Read
+    /// from the DER kept next to the .p12, avoiding a keychain round-trip.
     public func clientPublicNumbers() throws -> ATVRSAPublicNumbers {
         let der = try Data(contentsOf: certificateURL)
         return try Self.publicNumbers(fromCertificateDER: der)
@@ -98,8 +97,8 @@ public final class ATVCertificateStore: @unchecked Sendable {
         if let attributes = SecKeyCopyAttributes(key) as? [String: Any],
            let type = attributes[kSecAttrKeyType as String] as? String,
            type != (kSecAttrKeyTypeRSA as String) {
-            // The pairing secret is defined over RSA numbers; a non-RSA server
-            // cert cannot be paired with at all.
+            // The pairing secret is defined over RSA numbers, so a non-RSA
+            // server cert cannot be paired with.
             throw ATVError.certificateFailure("certificate key is not RSA")
         }
         var error: Unmanaged<CFError>?
@@ -158,8 +157,8 @@ public final class ATVCertificateStore: @unchecked Sendable {
 
     // MARK: - paired hosts
 
-    /// The TV remembers our certificate; this is the client-side mirror of that
-    /// fact, so the UI can offer "pair" vs "power" without probing the network.
+    /// Client-side mirror of the TV remembering the client certificate, so the
+    /// UI can offer "pair" or "power" without probing the network.
     public func pairedHosts() -> [String] {
         lock.lock()
         defer { lock.unlock() }
@@ -298,9 +297,8 @@ public final class ATVCertificateStore: @unchecked Sendable {
 enum ATVPairingSecret {
 
     /// SHA-256 over (client modulus ‖ client exponent ‖ server modulus ‖
-    /// server exponent ‖ nonce), where the nonce is the PIN's last 4 hex chars
-    /// and the digest's first byte must equal the PIN's first 2 hex chars —
-    /// that check is how a mistyped PIN is caught before the TV sees it.
+    /// server exponent ‖ nonce), nonce being the PIN's last 4 hex chars. The
+    /// digest's first byte must equal the PIN's first 2, catching a typo here.
     static func compute(client: ATVRSAPublicNumbers,
                         server: ATVRSAPublicNumbers,
                         pin: String) throws -> Data {

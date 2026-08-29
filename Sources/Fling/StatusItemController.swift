@@ -18,8 +18,8 @@ final class StatusItemController: NSObject {
         super.init()
 
         popover.behavior = .transient
-        // No fixed contentSize — the panel's height varies by state (artwork,
-        // transport rows), and pinning it clipped the taller states.
+        // No fixed contentSize: panel height varies by state, and pinning it
+        // clips the taller states.
         let host = NSHostingController(rootView: PanelView(state: state))
         host.sizingOptions = [.preferredContentSize]
         popover.contentViewController = host
@@ -32,7 +32,6 @@ final class StatusItemController: NSObject {
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
 
-        // Redraw the title whenever elapsed time or panel state changes.
         state.objectWillChange
             .receive(on: RunLoop.main)
             .sink { [weak self] in self?.updateTitle() }
@@ -41,13 +40,13 @@ final class StatusItemController: NSObject {
         updateTitle()
         startPolling()
 
-        // Deliberately NOT awaited here. `refresh()` is subprocess I/O; blocking
-        // init on it prevents the run loop from ever drawing the status item.
+        // Not awaited: `refresh()` is subprocess I/O, and blocking init on it
+        // stops the run loop from ever drawing the status item.
         Task { await state.refresh() }
     }
 
-    /// Polls only while the popover is open or something is casting — there is
-    /// no reason to hit the device once a second while the menu bar is idle.
+    /// Polls only while the popover is open or something is casting; an idle
+    /// menu bar must not hit the device every two seconds.
     private func startPolling() {
         pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
@@ -78,8 +77,8 @@ final class StatusItemController: NSObject {
         }
     }
 
-    /// `popUp` is used rather than assigning `statusItem.menu`, which would
-    /// permanently hijack left-click and stop the popover from ever opening.
+    /// Uses `popUp` rather than `statusItem.menu`, which would permanently
+    /// hijack left-click and stop the popover from ever opening.
     private func showMenu(from button: NSStatusBarButton) {
         if popover.isShown { popover.performClose(nil) }
         let menu = ContextMenuBuilder(state: state).build()

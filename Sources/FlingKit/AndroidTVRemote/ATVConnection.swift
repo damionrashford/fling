@@ -30,8 +30,8 @@ final class ATVFramedConnection: @unchecked Sendable {
 
         let capture = CertificateCapture()
         // The TV's certificate is self-signed, so system trust evaluation would
-        // always fail; the protocol's trust model is the pairing secret instead.
-        // Accept the cert and keep its DER for that computation.
+        // always fail; the protocol's trust model is the pairing secret. Accept
+        // the cert and keep its DER for that computation.
         sec_protocol_options_set_verify_block(security, { _, secTrust, complete in
             let trust = sec_trust_copy_ref(secTrust).takeRetainedValue()
             if let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
@@ -84,7 +84,7 @@ final class ATVFramedConnection: @unchecked Sendable {
                 }
             }
             // NWConnection's own TCP timeout runs over a minute; a menu-bar
-            // button needs to give up much sooner.
+            // button must give up sooner.
             queue.asyncAfter(deadline: .now() + timeout) { [weak self] in
                 guard let self else { return }
                 self.lock.lock()
@@ -118,7 +118,7 @@ final class ATVFramedConnection: @unchecked Sendable {
         }
     }
 
-    /// Returns the next complete protobuf message. Single reader only — both
+    /// Returns the next complete protobuf message. Single reader only: both
     /// protocols are strictly message-at-a-time on one loop.
     func receiveMessage() async throws -> Data {
         while true {
@@ -161,10 +161,9 @@ final class ATVFramedConnection: @unchecked Sendable {
     }
 }
 
-/// Races `operation` against a wall clock. The operation itself is not
-/// cancellation-responsive (it sits on Network callbacks), so callers must
-/// cancel the underlying connection when this throws `.connectionTimeout` —
-/// that unblocks the loser and lets its task finish.
+/// Races `operation` against a wall clock. The operation is not
+/// cancellation-responsive, so callers must cancel the underlying connection
+/// when this throws `.connectionTimeout` to unblock the losing task.
 func withATVDeadline<T: Sendable>(seconds: TimeInterval,
                                   _ operation: @escaping @Sendable () async throws -> T) async throws -> T {
     try await withThrowingTaskGroup(of: T.self) { group in

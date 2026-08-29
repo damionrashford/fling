@@ -2,8 +2,7 @@ import Foundation
 
 /// The remote-control session on port 6466 (remotemessage.proto), ported from
 /// androidtvremote2 remote.py: configure/set-active handshake, ping keepalive,
-/// key injection, power state from RemoteStart, foreground-app reporting, IME
-/// text entry, and voice streaming.
+/// key injection, power state, app reporting, IME text, and voice streaming.
 public actor ATVRemoteClient {
 
     public enum Event: Sendable, Equatable {
@@ -52,9 +51,9 @@ public actor ATVRemoteClient {
         self.activeFeatures = ATVRemoteMessage.Features.requested(voice: enableVoice)
     }
 
-    /// Connects and completes the handshake; returns once RemoteStart arrives
-    /// (so `isOn` is valid). A TLS failure here usually means the TV no longer
-    /// holds our certificate and pairing is needed.
+    /// Connects and completes the handshake, returning once RemoteStart makes
+    /// `isOn` valid. A TLS failure here usually means the TV no longer holds
+    /// the client certificate and pairing is needed.
     public func connect(host: String, port: UInt16 = 6466) async throws {
         teardown(emitDisconnected: false)
         let identity = try store.loadIdentity()
@@ -84,10 +83,6 @@ public actor ATVRemoteClient {
         }
     }
 
-    public func disconnect() {
-        teardown(emitDisconnected: isConnected)
-    }
-
     /// Injects a SHORT key press (remote.py send_key_command).
     public func sendKey(_ keyCode: Int32) async throws {
         guard isConnected, let connection else { throw ATVError.notConnected }
@@ -107,8 +102,8 @@ public actor ATVRemoteClient {
     }
 
     /// Commits text through the IME (remote.py send_text). Only takes effect
-    /// when a text field is focused on the TV — otherwise the TV never sent the
-    /// counters this echoes and silently drops the edit.
+    /// when a text field is focused on the TV: otherwise the counters this
+    /// echoes were never sent and the TV drops the edit.
     public func sendText(_ text: String) async throws {
         guard isConnected, let connection else { throw ATVError.notConnected }
         guard !text.isEmpty else { throw ATVError.invalidText }
@@ -120,9 +115,8 @@ public actor ATVRemoteClient {
     // MARK: - voice
 
     /// Opens a voice session: sends KEYCODE_SEARCH, waits for the TV's
-    /// RemoteVoiceBegin, then echoes it back (remote.py start_voice). Audio is
-    /// then streamed with `sendVoice`. Requires the session to have negotiated
-    /// the VOICE feature (construct with `enableVoice: true`).
+    /// RemoteVoiceBegin, then echoes it back (remote.py start_voice). Requires
+    /// the VOICE feature to have been negotiated.
     public func beginVoice() async throws {
         guard isConnected, let connection else { throw ATVError.notConnected }
         guard activeFeatures.contains(.voice) else { throw ATVError.voiceNotEnabled }
@@ -170,8 +164,8 @@ public actor ATVRemoteClient {
     }
 
     /// Connection, power, and foreground-app changes. Each call returns an
-    /// independent stream; events are not replayed, so read `isOn` / `currentApp`
-    /// for the current state.
+    /// independent stream, and events are not replayed, so read `isOn` /
+    /// `currentApp` for the current state.
     public func events() -> AsyncStream<Event> {
         let (stream, continuation) = AsyncStream.makeStream(of: Event.self)
         let id = UUID()
