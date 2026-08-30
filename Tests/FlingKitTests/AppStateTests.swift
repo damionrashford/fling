@@ -69,7 +69,7 @@ final class AppStateTests: XCTestCase {
         state.selectedDevice = DeviceInfo(ip: "1.2.3.4", name: "TV", model: "TCL")
         state.setVolume(70)
         await state.flushVolume()
-        XCTAssertEqual(r.calls.last?.args, ["-d", "TV", "volume", "70"])
+        XCTAssertEqual(r.calls.last?.args, ["-d", "1.2.3.4", "volume", "70"])
     }
 
     /// Dragging the slider emits an event per pixel; without debouncing each
@@ -84,7 +84,7 @@ final class AppStateTests: XCTestCase {
 
         let volumeCalls = r.calls.filter { $0.args.contains("volume") }
         XCTAssertEqual(volumeCalls.count, 1, "expected one command, got \(volumeCalls.count)")
-        XCTAssertEqual(volumeCalls.last?.args, ["-d", "TV", "volume", "70"])
+        XCTAssertEqual(volumeCalls.last?.args, ["-d", "1.2.3.4", "volume", "70"])
     }
 
     // MARK: - actions

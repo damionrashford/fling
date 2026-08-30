@@ -207,18 +207,33 @@ final class ATVFramedConnection: @unchecked Sendable {
 /// cannot propagate the timeout — until `onDeadline` unblocks it by cancelling
 /// the underlying connection. Without that hook the deadline never actually
 /// fired: the group sat on the stuck receive until the OS TCP timeout.
+/// Set-once flag shared between the timer child and the awaiting parent.
+private final class ATVDeadlineFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    func set() { lock.lock(); value = true; lock.unlock() }
+    var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
+}
+
 func withATVDeadline<T: Sendable>(seconds: TimeInterval,
                                   onDeadline: (@Sendable () -> Void)? = nil,
                                   _ operation: @escaping @Sendable () async throws -> T) async throws -> T {
-    try await withThrowingTaskGroup(of: T.self) { group in
+    let expired = ATVDeadlineFlag()
+    return try await withThrowingTaskGroup(of: T.self) { group in
         group.addTask { try await operation() }
         group.addTask {
             try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            expired.set()
             onDeadline?()
             throw ATVError.connectionTimeout
         }
-        let result = try await group.next()!
-        group.cancelAll()
-        return result
+        defer { group.cancelAll() }
+        do {
+            return try await group.next()!
+        } catch {
+            // After the deadline fires, the unblocked operation's own error
+            // races the timer's; report the timeout either way.
+            throw expired.isSet ? ATVError.connectionTimeout : error
+        }
     }
 }
