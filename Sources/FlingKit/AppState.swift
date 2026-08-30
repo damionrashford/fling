@@ -60,6 +60,9 @@ public final class AppState: ObservableObject {
     /// emits an event per pixel, and each one would spawn a `catt` subprocess.
     public static let volumeDebounce = Duration.milliseconds(180)
 
+    /// Seek step in seconds; UI labels derive from it so they can't drift.
+    public static let seekStep = 30
+
     public init(catt: CattClient?, browsers: BrowserReader, atv: AndroidTVRemote? = nil,
                 prober: TabProber? = nil) {
         self.catt = catt

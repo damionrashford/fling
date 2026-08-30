@@ -138,7 +138,7 @@ public struct TabProber: @unchecked Sendable {
         let streamURL = isHTTP(main.src)
             ? main.src
             : (payload.manifests ?? []).first(where: isHTTP)
-        let resumeAt = (main.time ?? 0) >= 5 ? main.time : nil
+        let resumeAt = (main.time ?? 0) >= CastPlanner.resumeThreshold ? main.time : nil
 
         return TabMedia(streamURL: streamURL,
                         resumeAt: resumeAt,

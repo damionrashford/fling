@@ -35,8 +35,12 @@ struct ContextMenuBuilder {
 
         menu.addItem(action(state.status.isPlaying ? "Pause" : "Play",
                             enabled: casting) { Task { await state.togglePlayPause() } })
-        menu.addItem(action("Back 30s", enabled: casting) { Task { await state.seek(by: -30) } })
-        menu.addItem(action("Forward 30s", enabled: casting) { Task { await state.seek(by: 30) } })
+        menu.addItem(action("Back \(AppState.seekStep)s", enabled: casting) {
+            Task { await state.seek(by: -AppState.seekStep) }
+        })
+        menu.addItem(action("Forward \(AppState.seekStep)s", enabled: casting) {
+            Task { await state.seek(by: AppState.seekStep) }
+        })
 
         // NSMenu cannot host a slider, so offer presets instead.
         menu.addItem(submenu("Volume — \(state.volume)%",

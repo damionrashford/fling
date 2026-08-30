@@ -14,12 +14,16 @@ public struct CastPlan: Equatable, Sendable {
 }
 
 public enum CastPlanner {
+
+    /// Positions shorter than this aren't worth resuming; shared with the
+    /// prober so the two gates can never drift apart.
+    public static let resumeThreshold: TimeInterval = 5
     /// Decides what to actually cast for a tab, given an optional probe result.
     public static func plan(tab: TabRef, media: TabMedia?) -> CastPlan {
         // The prober already gates at 5s; re-gated so the rule holds for any
         // hand-built TabMedia too.
         let resume: TimeInterval?
-        if let t = media?.resumeAt, t >= 5 { resume = t } else { resume = nil }
+        if let t = media?.resumeAt, t >= Self.resumeThreshold { resume = t } else { resume = nil }
 
         // The YouTube receiver owns playback and wants the page URL, not the
         // stream the page happens to be feeding its <video>.

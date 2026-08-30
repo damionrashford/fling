@@ -39,7 +39,7 @@ struct PanelView: View {
 
     @ViewBuilder private var castSection: some View {
         switch state.panel {
-        case .setupNeeded:                 setup
+        case .setupNeeded:                 EmptyView()   // peeled off in body
         case .casting:                     casting
         case .idleCastable:                idle(reason: nil)
         case .idleNotCastable(let reason): idle(reason: reason)
@@ -179,8 +179,12 @@ struct PanelView: View {
             MenuRow(title: state.status.isPlaying ? "Pause" : "Play", shortcut: "Space") {
                 Task { await state.togglePlayPause() }
             }
-            MenuRow(title: "Back 30s", shortcut: "←") { Task { await state.seek(by: -30) } }
-            MenuRow(title: "Forward 30s", shortcut: "→") { Task { await state.seek(by: 30) } }
+            MenuRow(title: "Back \(AppState.seekStep)s", shortcut: "←") {
+                Task { await state.seek(by: -AppState.seekStep) }
+            }
+            MenuRow(title: "Forward \(AppState.seekStep)s", shortcut: "→") {
+                Task { await state.seek(by: AppState.seekStep) }
+            }
 
             VolumeRow(state: state)          // same slot as idle
 

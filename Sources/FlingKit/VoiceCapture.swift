@@ -10,7 +10,7 @@ public enum VoiceCaptureError: Error {
 public final class VoiceCapture {
 
     /// The transport's minimum payload size; anything smaller gets zero-padded.
-    public static let chunkBytes = 8 * 1024
+    public static let chunkBytes = ATVRemoteMessage.voiceChunkMinSize
 
     private let engine = AVAudioEngine()
     /// removeTap does not wait for an in-flight tap callback, so `pending` is
