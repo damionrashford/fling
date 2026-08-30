@@ -11,6 +11,7 @@ final class StatusItemController: NSObject {
     private let state: AppState
     private var cancellables = Set<AnyCancellable>()
     private var pollTimer: Timer?
+    private var scrollRemote: ScrollRemote?
 
     init(state: AppState) {
         self.state = state
@@ -39,6 +40,10 @@ final class StatusItemController: NSObject {
 
         updateTitle()
         startPolling()
+        scrollRemote = ScrollRemote(state: state) { [weak popover] event in
+            guard let popover, popover.isShown else { return false }
+            return event.window === popover.contentViewController?.view.window
+        }
 
         // Not awaited: `refresh()` is subprocess I/O, and blocking init on it
         // stops the run loop from ever drawing the status item.
@@ -75,6 +80,7 @@ final class StatusItemController: NSObject {
 
     private func togglePopover(_ sender: NSStatusBarButton) {
         if popover.isShown {
+            scrollRemote?.resetGesture()
             popover.performClose(nil)
         } else {
             popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)

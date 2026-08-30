@@ -118,9 +118,11 @@ struct RemoteView: View {
                     .help("Home")
             }
             KeyButton(symbol: "chevron.down", size: 30, state: state, code: ATVKeyCode.dpadDown)
+            Text("or scroll anywhere to move around the TV")
+                .font(.system(size: 9.5)).foregroundStyle(.quaternary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 6).padding(.bottom, 10)
+        .padding(.top, 6).padding(.bottom, 8)
     }
 
     private var volumeKeys: some View {
