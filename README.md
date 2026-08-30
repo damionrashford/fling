@@ -109,6 +109,9 @@ HDMI-CEC.
 - **App launcher** — one click opens YouTube, Netflix, Prime Video, Disney+,
   Spotify, Plex, or Tubi on the TV.
 - **D-pad** — arrows, OK, Back, Home. Navigate anything.
+- **Scroll to navigate** — two-finger scroll (or mouse wheel) anywhere over
+  the open panel moves through the TV's rows and grids; horizontal scrolling
+  moves sideways. Flick momentum is ignored so lists don't run away.
 - **Volume** — Vol−, Mute, Vol+ act instantly on the TV (the Cast page's
   slider controls the cast stream instead).
 - **Type on TV** — put the TV's cursor in any text field (search, login),
