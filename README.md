@@ -12,7 +12,7 @@ power, apps, d-pad, volume, typing, voice search.
 ![Swift 6](https://img.shields.io/badge/Swift-6.0-F05138?logo=swift&logoColor=white)
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)
 ![Universal](https://img.shields.io/badge/binary-universal-4B8BBE)
-![Tests](https://img.shields.io/badge/tests-291%20passing-2EA44F)
+![Tests](https://img.shields.io/badge/tests-299%20passing-2EA44F)
 
 <img src=".github/panel.png" width="340" alt="Fling's panel while casting: playback controls, app launcher, d-pad, volume, typing, and voice search in one view">
 
@@ -23,7 +23,8 @@ power, apps, d-pad, volume, typing, voice search.
 **Contents** · [Install](#install) · [Quick start](#quick-start) ·
 [Casting](#casting) · [Controlling the TV](#controlling-the-tv) ·
 [Troubleshooting](#troubleshooting) · [Update / uninstall](#update--uninstall) ·
-[Compatibility](#compatibility) · [Privacy](#privacy) · [Development](#development)
+[Compatibility](#compatibility) · [Privacy](#privacy) ·
+[Documentation](#documentation) · [Development](#development)
 
 ## Install
 
@@ -174,16 +175,36 @@ everything.
 Everything runs on your LAN. No servers, no accounts, no analytics, nothing
 phones home. The mic streams to your TV only while the mic button is red.
 
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | The three layers, state model, threading rules |
+| [docs/remote-protocol.md](docs/remote-protocol.md) | The Android TV Remote v2 implementation: pairing, session, voice |
+| [docs/casting.md](docs/casting.md) | URL classification, the in-page probe, cast planning, resume |
+| [docs/development.md](docs/development.md) | Building, testing, the preview harness, the live hardware driver |
+| [docs/distribution.md](docs/distribution.md) | The repo-served binary, installers, the signing model |
+| [CHANGELOG.md](CHANGELOG.md) | Release history, [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format |
+
 ## Development
 
+```
+Sources/
+├── Fling/       menu bar app — panel UI, status item, shortcuts, scroll remote
+└── FlingKit/    state hub, casting pipeline, browser + process seams
+    └── AndroidTVRemote/   dependency-free Android TV Remote v2 client
+Tests/FlingKitTests/       299 hermetic tests — no TV, browser, or network
+Scripts/                   bundle, installers, binary publishing
+bin/Fling                  the universal binary the installers serve
+```
+
 ```sh
-swift build && swift test    # 291 tests
+swift build && swift test    # 299 tests
 ./Scripts/bundle.sh          # signed .app in build/ (identity in Scripts/signing-identity.local, else ad-hoc)
 ./Scripts/publish-bin.sh     # refresh bin/Fling, the binary the installer serves
 ```
 
 `Fling --preview-panel` renders every panel state in one window;
-`FLING_PREVIEW=hero` renders the screenshot above. The Remote implementation
-is a dependency-free Android TV Remote protocol v2 client —
-TLS certificate pairing, hand-rolled protobuf, golden-byte tests — in
-[`Sources/FlingKit/AndroidTVRemote/`](Sources/FlingKit/AndroidTVRemote/).
+`FLING_PREVIEW=hero` renders the screenshot above. The deeper story —
+architecture, the protocol implementation, the hardware-in-the-loop test
+driver — lives in [docs/](docs/).
