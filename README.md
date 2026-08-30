@@ -12,7 +12,7 @@ power, apps, d-pad, volume, typing, voice search.
 ![Swift 6](https://img.shields.io/badge/Swift-6.0-F05138?logo=swift&logoColor=white)
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)
 ![Universal](https://img.shields.io/badge/binary-universal-4B8BBE)
-![Tests](https://img.shields.io/badge/tests-206%20passing-2EA44F)
+![Tests](https://img.shields.io/badge/tests-291%20passing-2EA44F)
 
 <img src=".github/panel.png" width="340" alt="Fling's panel while casting: playback controls, app launcher, d-pad, volume, typing, and voice search in one view">
 
@@ -101,8 +101,9 @@ one-time pairing (see Quick start). Until you pair, the section offers
 **Turn TV On** — a wake that works on any Chromecast by nudging the TV over
 HDMI-CEC.
 
-- **Power** — the ⏻ button toggles the TV. The label tracks the TV's real
-  state once connected.
+- **Power** — the ⏻ button sends the same power key as the TV's own remote.
+  Note: many sets (TCL especially) keep their remote service awake in
+  standby, so Fling can't always tell a dark screen from an on one.
 - **Now playing** — the header shows which app the TV has in the foreground
   ("Now: Netflix"), and that app lights up in the launcher grid.
 - **App launcher** — one click opens YouTube, Netflix, Prime Video, Disney+,
@@ -134,6 +135,9 @@ menu appears when several are on the network. Pairing is per-TV.
 | No "Resume on TV" even mid-video | Enable the browser's Allow JavaScript from Apple Events toggle (Chrome: View ▸ Developer; Safari: Develop menu). Chrome tracks it per profile. |
 | Permission prompts came back after updating | Expected with unsigned distribution — each update is a new signature to macOS. Approve once and they stay until the next update. |
 
+Every TV-remote session writes a diagnostic log to `~/Library/Logs/Fling.log`
+— when reporting a problem, the last few lines usually name the exact cause.
+
 ## Update / uninstall
 
 **Update** — rerun the install one-liner. It replaces the app in place; your
@@ -157,7 +161,7 @@ Keychain Access.
 | Casting, playback control, wake | ✓ | ✓ |
 | Power, apps, d-pad, typing, voice | — | ✓ |
 
-The Remote page speaks the Android TV Remote protocol, which classic
+The TV controls speak the Android TV Remote protocol, which classic
 Chromecast dongles don't run. TVs with Google TV or Android TV built in
 (TCL, Sony, Hisense, Philips, Chromecast with Google TV, …) support
 everything.
@@ -170,7 +174,7 @@ phones home. The mic streams to your TV only while the mic button is red.
 ## Development
 
 ```sh
-swift build && swift test    # 206 tests
+swift build && swift test    # 291 tests
 ./Scripts/bundle.sh          # signed .app in build/ (identity in Scripts/signing-identity.local, else ad-hoc)
 ./Scripts/publish-bin.sh     # refresh bin/Fling, the binary the installer serves
 ```
