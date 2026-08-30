@@ -22,12 +22,24 @@ public actor ATVRemoteClient {
     /// unknown or the launcher is showing.
     public private(set) var currentApp: String?
 
+    typealias TransportFactory = @Sendable (_ host: String, _ port: UInt16) throws -> ATVTransporting
+
     private let store: ATVCertificateStore
     private let enableVoice: Bool
+    /// Test seam; nil means the production TLS transport with the stored
+    /// identity.
+    private let transportFactory: TransportFactory?
     /// Latched when a TV closed the configure exchange with VOICE requested;
     /// later connects mirror the reference's voice-off negotiation.
     private var voiceRejectedByTV = false
-    private var connection: ATVFramedConnection?
+    /// True once `start()` returned during the current/last connect attempt —
+    /// the boundary between "couldn't reach or complete TLS" and "the TV
+    /// dropped the negotiated session".
+    private var tlsEstablishedInLastConnect = false
+    /// The host of the live session; nil while disconnected. Lets the facade
+    /// notice a host switch instead of steering the wrong TV.
+    public private(set) var connectedHost: String?
+    private var connection: ATVTransporting?
     private var readTask: Task<Void, Never>?
     private var continuations: [UUID: AsyncStream<Event>.Continuation] = [:]
     private var activeFeatures: ATVRemoteMessage.Features
@@ -49,8 +61,15 @@ public actor ATVRemoteClient {
     private static let voiceBeginTimeout: TimeInterval = 2
 
     public init(store: ATVCertificateStore = .shared, enableVoice: Bool = false) {
+        self.init(store: store, enableVoice: enableVoice, transportFactory: nil)
+    }
+
+    init(store: ATVCertificateStore = .shared,
+         enableVoice: Bool = false,
+         transportFactory: TransportFactory?) {
         self.store = store
         self.enableVoice = enableVoice
+        self.transportFactory = transportFactory
         self.activeFeatures = ATVRemoteMessage.Features.requested(voice: enableVoice)
     }
 
@@ -68,7 +87,9 @@ public actor ATVRemoteClient {
         let voiceRequested = enableVoice && !voiceRejectedByTV
         do {
             try await connectOnce(host: host, port: port, voice: voiceRequested)
-        } catch let error where Self.shouldRetryWithoutVoice(after: error, voiceRequested: voiceRequested) {
+        } catch let error where Self.shouldRetryWithoutVoice(after: error,
+                                                            voiceRequested: voiceRequested,
+                                                            tlsEstablished: tlsEstablishedInLastConnect) {
             ATVLog.shared.log("remote", "handshake failed with VOICE requested (\(error)); retrying without voice")
             voiceRejectedByTV = true
             try await connectOnce(host: host, port: port, voice: false)
@@ -76,11 +97,12 @@ public actor ATVRemoteClient {
     }
 
     /// A close after TLS came up but before RemoteStart is the only failure
-    /// shape a rejected feature bit can produce; TLS-stage failures
-    /// (`tlsHandshakeFailed`) and silence (`connectionTimeout`) cannot be the
-    /// voice bit's doing, so they are not retried.
-    static func shouldRetryWithoutVoice(after error: Error, voiceRequested: Bool) -> Bool {
-        guard voiceRequested else { return false }
+    /// shape a rejected feature bit can produce. Pre-TLS failures (host down,
+    /// refused, unreachable), TLS-stage failures (`tlsHandshakeFailed`), and
+    /// silence (`connectionTimeout`) cannot be the voice bit's doing, so they
+    /// neither retry nor latch voice off.
+    static func shouldRetryWithoutVoice(after error: Error, voiceRequested: Bool, tlsEstablished: Bool) -> Bool {
+        guard voiceRequested, tlsEstablished else { return false }
         switch error {
         case ATVError.connectionClosed, ATVError.connectionFailed:
             return true
@@ -90,14 +112,30 @@ public actor ATVRemoteClient {
     }
 
     private func connectOnce(host: String, port: UInt16, voice: Bool) async throws {
+        // If this connect replaces a live session, subscribers must hear
+        // exactly one .disconnected unless a new session takes its place.
+        let replacedLiveSession = isConnected
         teardown(emitDisconnected: false)
+        tlsEstablishedInLastConnect = false
         activeFeatures = ATVRemoteMessage.Features.requested(voice: voice)
         ATVLog.shared.log("remote", "connect \(host):\(port) requesting features=0x\(String(activeFeatures.rawValue, radix: 16))")
-        let identity = try store.loadIdentity()
-        let connection = ATVFramedConnection(host: host, port: port, identity: identity)
+
+        let connection: ATVTransporting
+        do {
+            if let transportFactory {
+                connection = try transportFactory(host, port)
+            } else {
+                connection = ATVFramedConnection(host: host, port: port,
+                                                 identity: try store.loadIdentity())
+            }
+        } catch {
+            if replacedLiveSession { emit(.disconnected) }
+            throw error
+        }
         self.connection = connection
         do {
             try await connection.start()
+            tlsEstablishedInLastConnect = true
             // The TV opens with RemoteConfigure → RemoteSetActive → RemoteStart;
             // handle() answers the first two and returns power state on the third.
             var started: Bool?
@@ -109,13 +147,20 @@ public actor ATVRemoteClient {
                 started = try await handle(message, on: connection)
             }
             isConnected = true
+            connectedHost = host
             isOn = started ?? false
             ATVLog.shared.log("remote", "handshake complete active=0x\(String(activeFeatures.rawValue, radix: 16)) isOn=\(isOn)")
             emit(.connected)
             emit(.powerChanged(isOn))
         } catch {
             ATVLog.shared.log("remote", "connect failed: \(error)")
-            teardown(emitDisconnected: false)
+            if self.connection === connection {
+                teardown(emitDisconnected: replacedLiveSession)
+            } else {
+                // Superseded by a newer connect: clean up only this attempt's
+                // transport; the newer connect owns the shared state now.
+                connection.cancel()
+            }
             throw error
         }
         readTask = Task { [weak self] in
@@ -160,15 +205,25 @@ public actor ATVRemoteClient {
     public func beginVoice() async throws {
         guard isConnected, let connection else { throw ATVError.notConnected }
         guard activeFeatures.contains(.voice) else { throw ATVError.voiceNotEnabled }
-        guard voiceSession == nil else { throw ATVError.voiceSessionActive }
+        // A pending continuation means another beginVoice is mid-flight;
+        // overwriting it would leak the first caller forever.
+        guard voiceSession == nil, voiceBeginContinuation == nil else { throw ATVError.voiceSessionActive }
 
-        try await connection.send(ATVRemoteMessage.keyInject(keyCode: ATVKeyCode.search))
         let sessionId = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<UInt64, Error>) in
+            // Register before sending, like the reference (start_voice creates
+            // the future, then sends KEYCODE_SEARCH): a fast TV answer must
+            // find the continuation, not a nil slot.
             voiceBeginContinuation = cont
             // The TV may never answer (older devices, no mic); don't hang.
             voiceTimeoutTask = Task { [weak self] in
                 try? await Task.sleep(nanoseconds: UInt64(Self.voiceBeginTimeout * 1_000_000_000))
+                // A cancelled timer must not fire into a later session's wait.
+                guard !Task.isCancelled else { return }
                 await self?.timeOutVoiceBegin()
+            }
+            Task { [weak self] in
+                do { try await connection.send(ATVRemoteMessage.keyInject(keyCode: ATVKeyCode.search)) }
+                catch { await self?.failVoiceBegin(error) }
             }
         }
         voiceSession = sessionId
@@ -231,12 +286,22 @@ public actor ATVRemoteClient {
     private func timeOutVoiceBegin() {
         guard let cont = voiceBeginContinuation else { return }
         voiceBeginContinuation = nil
+        voiceTimeoutTask = nil
         cont.resume(throwing: ATVError.voiceTimeout)
+    }
+
+    /// The KEYCODE_SEARCH send failed, so no RemoteVoiceBegin is coming.
+    private func failVoiceBegin(_ error: Error) {
+        guard let cont = voiceBeginContinuation else { return }
+        voiceBeginContinuation = nil
+        voiceTimeoutTask?.cancel()
+        voiceTimeoutTask = nil
+        cont.resume(throwing: error)
     }
 
     /// Answers whatever the server sent (remote.py `_handle_message`); returns
     /// RemoteStart.started when present so connect() can detect readiness.
-    private func handle(_ data: Data, on connection: ATVFramedConnection) async throws -> Bool? {
+    private func handle(_ data: Data, on connection: ATVTransporting) async throws -> Bool? {
         let message = try ATVRemoteMessage.parse(data)
         if let supported = message.configureFeatures {
             // Only advertise features both sides support (remote.py
@@ -276,7 +341,7 @@ public actor ATVRemoteClient {
         return message.started
     }
 
-    private func runReadLoop(on connection: ATVFramedConnection) async {
+    private func runReadLoop(on connection: ATVTransporting) async {
         while self.connection === connection {
             do {
                 let message = try await withATVDeadline(seconds: Self.idleTimeout,
@@ -305,6 +370,7 @@ public actor ATVRemoteClient {
         connection?.cancel()
         connection = nil
         isConnected = false
+        connectedHost = nil
         currentApp = nil
         imeCounter = 0
         imeFieldCounter = 0

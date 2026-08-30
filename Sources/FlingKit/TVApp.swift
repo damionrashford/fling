@@ -17,10 +17,10 @@ public extension TVApp {
     /// The remote protocol has no "list installed apps" call, so the launcher
     /// is a curated catalog. Links follow the Home Assistant androidtv_remote
     /// community lists and are not verified per TV model.
-    /// Custom schemes route uniquely to the app; https links make Android TV
-    /// offer a browser/chooser instead. Apps without a scheme use the bare
-    /// package name, which the transport turns into a market:// launch — that
-    /// opens the installed app directly.
+    /// Link forms are hardware-verified on TCL Google TV (2026-08-29 live
+    /// run): custom schemes route uniquely; https works when the app has
+    /// verified its domain (Tubi); market:// launches do NOT open the app on
+    /// TCL, so bare packages are avoided.
     static let catalog: [TVApp] = [
         TVApp(name: "YouTube", link: "vnd.youtube.launch://",
               package: "com.google.android.youtube.tv"),

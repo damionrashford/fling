@@ -215,7 +215,9 @@ enum ATVRemoteMessage {
     static func keyInject(keyCode: Int32, direction: Direction = .short) -> Data {
         var w = ProtoWriter()
         w.message(Field.remoteKeyInject) { k in
-            k.varint(1, UInt64(keyCode))
+            // Enum varints are int32 sign-extended to 10 bytes, so a negative
+            // keycode must encode as two's complement, not trap.
+            k.varint(1, UInt64(bitPattern: Int64(keyCode)))
             k.varint(2, direction.rawValue)
         }
         return w.data

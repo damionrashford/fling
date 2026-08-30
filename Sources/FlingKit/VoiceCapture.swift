@@ -13,8 +13,9 @@ public final class VoiceCapture {
     public static let chunkBytes = 8 * 1024
 
     private let engine = AVAudioEngine()
-    /// Only touched from the tap's audio queue while running, and from `stop()`
-    /// after the tap is removed.
+    /// removeTap does not wait for an in-flight tap callback, so `pending` is
+    /// genuinely shared between the render thread and `stop()`.
+    private let lock = NSLock()
     private var pending = Data()
 
     public init() {}
@@ -46,11 +47,15 @@ public final class VoiceCapture {
                 return buffer
             }
             guard let channel = out.int16ChannelData, out.frameLength > 0 else { return }
+            self.lock.lock()
             self.pending.append(Data(bytes: channel[0], count: Int(out.frameLength) * 2))
+            var full: [Data] = []
             while self.pending.count >= Self.chunkBytes {
-                onChunk(Data(self.pending.prefix(Self.chunkBytes)))
+                full.append(Data(self.pending.prefix(Self.chunkBytes)))
                 self.pending.removeFirst(Self.chunkBytes)
             }
+            self.lock.unlock()
+            for chunk in full { onChunk(chunk) }
         }
 
         engine.prepare()
@@ -62,7 +67,8 @@ public final class VoiceCapture {
     public func stop() -> Data {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
-        defer { pending.removeAll() }
+        lock.lock()
+        defer { pending.removeAll(); lock.unlock() }
         return pending
     }
 }

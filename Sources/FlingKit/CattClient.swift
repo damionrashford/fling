@@ -35,7 +35,8 @@ public final class CattClient: @unchecked Sendable {
     // MARK: - commands
 
     public func scan() throws -> [DeviceInfo] {
-        CattParser.parseScan(try invoke(["scan"]))
+        // mDNS discovery alone takes ~10s; the default deadline is too tight.
+        CattParser.parseScan(try invoke(["scan"], timeout: 60))
     }
 
     public func status(device: String) throws -> CastStatus {
@@ -56,7 +57,8 @@ public final class CattClient: @unchecked Sendable {
         if let seekTo, seekTo >= 1 {
             opts += ["-t", String(Int(seekTo.rounded()))]
         }
-        _ = try invoke(["-d", device, "cast"] + opts + [url])
+        // yt-dlp extraction on slow sites can legitimately run past 30s.
+        _ = try invoke(["-d", device, "cast"] + opts + [url], timeout: 120)
     }
 
     public func setVolume(_ level: Int, device: String) throws {
@@ -76,20 +78,38 @@ public final class CattClient: @unchecked Sendable {
     /// Powers the TV screen on: the cast protocol has no power command, but
     /// launching a receiver app fires HDMI-CEC "One Touch Play". The launch
     /// result is ignored because DashCast's ack can outlive pychromecast's
-    /// 10 s wait; the follow-up `stop` is the signal the TV answered.
-    public func wake(device: String, settle: TimeInterval = 1.0) throws {
+    /// 10 s wait; the follow-up `stop` is the signal the TV answered, retried
+    /// with short backoff until it succeeds or `settle` seconds pass — CEC
+    /// wake-up time varies per TV, so a fixed sleep either wastes time or
+    /// gives up too early.
+    public func wake(device: String, settle: TimeInterval = 8.0) throws {
         _ = try? invoke(["-d", device, "cast_site", "https://example.com"])
-        Thread.sleep(forTimeInterval: settle)
-        _ = try invoke(["-d", device, "stop"])
+        let deadline = Date().addingTimeInterval(settle)
+        while true {
+            do { _ = try invoke(["-d", device, "stop"]); return }
+            catch {
+                guard Date() < deadline else { throw error }
+                Thread.sleep(forTimeInterval: 0.5)
+            }
+        }
     }
 
     // MARK: - plumbing
 
-    /// `catt` exits 0 while printing errors to stdout, so the output is always
-    /// inspected rather than trusting the exit status.
-    private func invoke(_ args: [String]) throws -> String {
-        let output = try runner.run(executable, args)
-        if let message = CattParser.parseError(output) { throw CattError(message) }
-        return output
+    /// `catt` exits 0 while printing errors to stdout, so stdout is always
+    /// inspected — but classification is structured (stdout/stderr/exit code)
+    /// so media titles can never read as errors.
+    private func invoke(_ args: [String],
+                        timeout: TimeInterval = ProcessTimeout.default) throws -> String {
+        let result = try runner.run(executable, args, timeout: timeout)
+        if result.timedOut {
+            throw CattError("catt did not finish in time and was stopped. Try again.")
+        }
+        if let message = CattParser.parseError(stdout: result.stdout,
+                                               stderr: result.stderr,
+                                               exitCode: result.exitCode) {
+            throw CattError(message)
+        }
+        return result.stdout
     }
 }

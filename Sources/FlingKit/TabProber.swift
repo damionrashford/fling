@@ -36,9 +36,21 @@ public struct TabProber: @unchecked Sendable {
 
     /// nil = page probed fine but has no media element.
     public func probe(_ browser: Browser) throws -> TabMedia? {
-        let output: String
-        do { output = try jxa.eval(browser.probeSnippet) }
+        let result: ProcessResult
+        do { result = try jxa.run(browser.probeSnippet) }
         catch { throw TabProbeError.probeFailed("\(error)") }
+
+        // The toggle refusal arrives on stderr of a failed run; matching page
+        // content in stdout would let a page *about* the error trip it.
+        guard result.succeeded else {
+            let err = result.stderr.lowercased()
+            if Self.disabledMarkers.contains(where: err.contains) {
+                throw TabProbeError.jsFromAppleEventsDisabled(browser)
+            }
+            throw TabProbeError.probeFailed(
+                result.stderr.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        let output = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
         return try TabProber.parse(output, browser: browser)
     }
 
@@ -109,10 +121,6 @@ public struct TabProber: @unchecked Sendable {
         guard let data = output.data(using: .utf8),
               let payload = try? JSONDecoder().decode(Payload.self, from: data)
         else {
-            let lower = output.lowercased()
-            if disabledMarkers.contains(where: lower.contains) {
-                throw TabProbeError.jsFromAppleEventsDisabled(browser)
-            }
             throw TabProbeError.probeFailed(output)
         }
         if let error = payload.error { throw TabProbeError.probeFailed(error) }

@@ -2,6 +2,16 @@ import Foundation
 import Network
 import Security
 
+/// Message-transport seam so session logic (handshake, reconnect, voice) is
+/// testable against a scripted fake; `ATVFramedConnection` is the production
+/// conformer. `AnyObject` because supersession checks use identity.
+protocol ATVTransporting: AnyObject, Sendable {
+    func start() async throws
+    func send(_ message: Data) async throws
+    func receiveMessage() async throws -> Data
+    func cancel()
+}
+
 /// TLS transport carrying varint-length-framed protobuf messages — the wire
 /// format both TV ports share (androidtvremote2 base.py).
 ///
@@ -199,6 +209,13 @@ final class ATVFramedConnection: @unchecked Sendable {
     func cancel() {
         ATVLog.shared.log("conn", "\(endpoint) cancel")
         connection.cancel()
+    }
+}
+
+extension ATVFramedConnection: ATVTransporting {
+    /// Default-argument methods don't witness protocol requirements.
+    func start() async throws {
+        try await start(timeout: 15)
     }
 }
 

@@ -9,6 +9,14 @@ final class TabProberTests: XCTestCase {
         return try TabProber(runner: r).probe(browser)
     }
 
+    /// Failed osascript run: refusals arrive on stderr with a non-zero exit.
+    private func probeFailing(stderr: String, _ browser: Browser = .chrome) throws -> TabMedia? {
+        let r = FakeRunner()
+        r.stubbedStderr = stderr
+        r.stubbedExitCode = 1
+        return try TabProber(runner: r).probe(browser)
+    }
+
     // MARK: snippet vocabulary (mirrors BrowserSourceTests style)
 
     func test_chrome_snippet_uses_execute_with_javascript_parameter() {
@@ -118,10 +126,10 @@ final class TabProberTests: XCTestCase {
     // MARK: error mapping
 
     /// Captured live on this machine from `osascript -l JavaScript -e` with
-    /// Chrome's toggle off (2026-08-28).
+    /// Chrome's toggle off (2026-08-28); osascript put it on stderr, exit 1.
     func test_chrome_disabled_toggle_maps_to_typed_error() {
-        let out = "execution error: Error: Error: Executing JavaScript through AppleScript is turned off. To turn it on, from the menu bar, go to View > Developer > Allow JavaScript from Apple Events. For more information: https://support.google.com/chrome/?p=applescript (12)"
-        XCTAssertThrowsError(try probe(out, .chrome)) { error in
+        let err = "execution error: Error: Error: Executing JavaScript through AppleScript is turned off. To turn it on, from the menu bar, go to View > Developer > Allow JavaScript from Apple Events. For more information: https://support.google.com/chrome/?p=applescript (12)"
+        XCTAssertThrowsError(try probeFailing(stderr: err, .chrome)) { error in
             XCTAssertEqual(error as? TabProbeError, .jsFromAppleEventsDisabled(.chrome))
         }
     }
@@ -129,17 +137,34 @@ final class TabProberTests: XCTestCase {
     /// Apple's documented `do JavaScript` refusal (error 8); the message names
     /// the Develop-menu toggle verbatim.
     func test_safari_disabled_toggle_maps_to_typed_error() {
-        let out = "execution error: Error: Error: The 'Allow JavaScript from Apple Events' option in Safari's Develop menu must be enabled to use 'do JavaScript'. (8)"
-        XCTAssertThrowsError(try probe(out, .safari)) { error in
+        let err = "execution error: Error: Error: The 'Allow JavaScript from Apple Events' option in Safari's Develop menu must be enabled to use 'do JavaScript'. (8)"
+        XCTAssertThrowsError(try probeFailing(stderr: err, .safari)) { error in
             XCTAssertEqual(error as? TabProbeError, .jsFromAppleEventsDisabled(.safari))
         }
     }
 
     func test_automation_denial_is_probeFailed_not_disabled() {
-        let out = "execution error: Error: Error: Not authorized to send Apple events to Google Chrome. (-1743)"
+        let err = "execution error: Error: Error: Not authorized to send Apple events to Google Chrome. (-1743)"
+        XCTAssertThrowsError(try probeFailing(stderr: err, .chrome)) { error in
+            XCTAssertEqual(error as? TabProbeError, .probeFailed(err))
+        }
+    }
+
+    // A page quoting the toggle's remediation text in its stdout payload must
+    // not read as the toggle being off — markers only count on stderr of a
+    // failed run.
+    func test_toggle_text_in_page_output_of_clean_run_is_not_disabled() {
+        let out = "how to fix: Allow JavaScript from Apple Events"
         XCTAssertThrowsError(try probe(out, .chrome)) { error in
             XCTAssertEqual(error as? TabProbeError, .probeFailed(out))
         }
+    }
+
+    func test_toggle_text_on_stderr_of_clean_exit_is_not_disabled() throws {
+        let r = FakeRunner()
+        r.stubbedOutput = #"{"elements":[],"manifests":[]}"#
+        r.stubbedStderr = "warning: Allow JavaScript from Apple Events deprecated someday"
+        XCTAssertNil(try TabProber(runner: r).probe(.chrome))
     }
 
     func test_malformed_json_throws_probeFailed() {

@@ -40,6 +40,9 @@ public actor AndroidTVRemote {
     private var pairing: ATVPairingClient?
     private var pairingHost: String?
     private var lastHost: String?
+    /// Single in-flight connect, joined by overlapping callers so a second
+    /// connect can't tear down the first one's fresh session.
+    private var inflightConnect: (id: UUID, host: String, task: Task<Void, Error>)?
 
     /// `enableVoice` negotiates the VOICE feature so `beginVoice`/`sendVoice`
     /// work. Off by default: once negotiated, KEYCODE_SEARCH puts the TV into
@@ -47,9 +50,17 @@ public actor AndroidTVRemote {
     public init(clientName: String = "Fling",
                 store: ATVCertificateStore = .shared,
                 enableVoice: Bool = false) {
+        self.init(clientName: clientName, store: store,
+                  remote: ATVRemoteClient(store: store, enableVoice: enableVoice))
+    }
+
+    /// Test seam: a remote with an injected transport.
+    init(clientName: String = "Fling",
+         store: ATVCertificateStore = .shared,
+         remote: ATVRemoteClient) {
         self.clientName = clientName
         self.store = store
-        self.remote = ATVRemoteClient(store: store, enableVoice: enableVoice)
+        self.remote = remote
     }
 
     // MARK: - pairing
@@ -89,7 +100,22 @@ public actor AndroidTVRemote {
     public func connect(host: String) async throws {
         guard hasPairing(host: host) else { throw ATVError.notPaired }
         lastHost = host
-        try await remote.connect(host: host)
+        if let inflight = inflightConnect, inflight.host == host {
+            return try await inflight.task.value
+        }
+        if let inflight = inflightConnect {
+            // A connect to a different host is settling; let it finish so two
+            // teardowns can't interleave. Its outcome is that caller's to
+            // handle, not ours.
+            _ = try? await inflight.task.value
+        }
+        let id = UUID()
+        let task = Task { [remote] in try await remote.connect(host: host) }
+        inflightConnect = (id, host, task)
+        // Identity-checked: while this call awaited, a joiner may have
+        // resumed first and a later call registered its own attempt.
+        defer { if inflightConnect?.id == id { inflightConnect = nil } }
+        try await task.value
     }
 
     /// Power state from the TV's last RemoteStart; meaningful once connected.
@@ -150,12 +176,13 @@ public actor AndroidTVRemote {
 
     // MARK: - plumbing
 
+    /// Connects when disconnected — and also when connected to a *different*
+    /// TV than requested, since sending there would steer the wrong device.
     private func ensureConnected(host: String?) async throws {
         if let host { lastHost = host }
         guard let target = lastHost else { throw ATVError.noHostConfigured }
-        if !(await remote.isConnected) {
-            try await connect(host: target)
-        }
+        if await remote.isConnected, await remote.connectedHost == target { return }
+        try await connect(host: target)
     }
 
     /// androidtv_remote.py send_launch_app_command: a value without a URL scheme

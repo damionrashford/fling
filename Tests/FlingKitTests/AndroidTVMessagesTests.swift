@@ -138,6 +138,13 @@ final class AndroidTVRemoteMessageTests: XCTestCase {
                        ATVTestHex.data("5204081a1003"))
     }
 
+    func test_key_inject_negative_keycode_encodes_twos_complement() {
+        // Enum varints sign-extend to 10 bytes (python-protobuf does the
+        // same); a negative Int32 must not trap the public API.
+        XCTAssertEqual(ATVRemoteMessage.keyInject(keyCode: -1),
+                       ATVTestHex.data("520d08ffffffffffffffffff011003"))
+    }
+
     func test_key_inject_long_press_direction() {
         XCTAssertEqual(ATVRemoteMessage.keyInject(keyCode: ATVKeyCode.power, direction: .startLong),
                        ATVTestHex.data("5204081a1001"))

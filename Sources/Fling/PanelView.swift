@@ -104,9 +104,11 @@ struct PanelView: View {
             Separator()
 
             // The only accented row, and it stays visible when disabled.
-            MenuRow(title: state.resumeLabel ?? "Cast this tab",
+            MenuRow(title: state.castInFlight ? "Casting…"
+                                              : (state.resumeLabel ?? "Cast this tab"),
                     icon: "play.rectangle.on.rectangle", shortcut: "⌘⇧C",
-                    accented: reason == nil, enabled: reason == nil) {
+                    accented: reason == nil,
+                    enabled: reason == nil && !state.castInFlight) {
                 Task { await state.castCurrentTab() }
             }
             // One contextual line, not a stack: the failure explanation when

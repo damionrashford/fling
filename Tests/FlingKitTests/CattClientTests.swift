@@ -6,13 +6,20 @@ import XCTest
 /// and read `calls` only after awaiting.
 final class FakeRunner: ProcessRunning, @unchecked Sendable {
     var calls: [(exe: String, args: [String])] = []
-    var stubbedOutput = ""
+    var timeouts: [TimeInterval] = []
+    var stubbedOutput = ""       // stdout
+    var stubbedStderr = ""
+    var stubbedExitCode: Int32 = 0
+    var stubbedTimedOut = false
     var errorToThrow: Error?
 
-    func run(_ executable: String, _ args: [String]) throws -> String {
+    func run(_ executable: String, _ args: [String],
+             timeout: TimeInterval) throws -> ProcessResult {
         calls.append((executable, args))
+        timeouts.append(timeout)
         if let errorToThrow { throw errorToThrow }
-        return stubbedOutput
+        return ProcessResult(exitCode: stubbedExitCode, stdout: stubbedOutput,
+                             stderr: stubbedStderr, timedOut: stubbedTimedOut)
     }
 }
 
@@ -126,9 +133,11 @@ final class CattClientTests: XCTestCase {
 
         init(outputs: [String]) { self.outputs = outputs }
 
-        func run(_ executable: String, _ args: [String]) throws -> String {
+        func run(_ executable: String, _ args: [String],
+                 timeout: TimeInterval) throws -> ProcessResult {
             calls.append(args)
-            return calls.count <= outputs.count ? outputs[calls.count - 1] : ""
+            let stdout = calls.count <= outputs.count ? outputs[calls.count - 1] : ""
+            return ProcessResult(exitCode: 0, stdout: stdout, stderr: "")
         }
     }
 
@@ -167,5 +176,64 @@ final class CattClientTests: XCTestCase {
             XCTAssertEqual((error as? CattError)?.message,
                            "The TV did not respond. Make sure it is awake, then try again.")
         }
+    }
+
+    // Casting a video literally titled "... timed out" must not read as a
+    // device timeout — the marker only counts outside Title lines.
+    func test_title_containing_timed_out_is_not_an_error() throws {
+        let r = FakeRunner()
+        r.stubbedOutput = """
+        Title: why my build timed out
+        Time: 00:00:10 / 00:01:00 (16%)
+        Volume: 40
+        Volume muted: False
+        """
+        let s = try client(r).status(device: "TV")
+        XCTAssertEqual(s.title, "why my build timed out")
+    }
+
+    func test_timeout_marker_on_stderr_of_failed_run_is_a_timeout() {
+        let r = FakeRunner()
+        r.stubbedStderr = "pychromecast.error.RequestTimeout: Execution of connect timed out"
+        r.stubbedExitCode = 1
+        XCTAssertThrowsError(try client(r).pause(device: "TV")) { error in
+            XCTAssertEqual((error as? CattError)?.message,
+                           "The TV did not respond. Make sure it is awake, then try again.")
+        }
+    }
+
+    func test_nonzero_exit_with_traceback_surfaces_last_stderr_line() {
+        let r = FakeRunner()
+        r.stubbedStderr = "Traceback (most recent call last):\nzeroconf.NonUniqueNameException"
+        r.stubbedExitCode = 1
+        XCTAssertThrowsError(try client(r).pause(device: "TV")) { error in
+            XCTAssertEqual((error as? CattError)?.message, "zeroconf.NonUniqueNameException")
+        }
+    }
+
+    // A wedged catt is killed by the runner; the report must be distinct from
+    // a receiver timeout so the user knows retrying is safe.
+    func test_killed_subprocess_reports_distinct_timeout_error() {
+        let r = FakeRunner()
+        r.stubbedTimedOut = true
+        XCTAssertThrowsError(try client(r).pause(device: "TV")) { error in
+            XCTAssertEqual((error as? CattError)?.message,
+                           "catt did not finish in time and was stopped. Try again.")
+        }
+    }
+
+    // Discovery alone takes ~10s, so scan gets a longer deadline than the rest.
+    func test_scan_uses_extended_timeout() throws {
+        let r = FakeRunner()
+        _ = try client(r).scan()
+        XCTAssertEqual(r.timeouts, [60])
+    }
+
+    func test_wake_retries_stop_until_the_device_answers() throws {
+        let r = SequencedRunner(outputs: ["", "Error: Failed to connect.", ""])
+        try CattClient(executable: "/usr/bin/catt", runner: r).wake(device: "TV", settle: 5)
+        XCTAssertEqual(r.calls.count, 3)
+        XCTAssertEqual(r.calls[1], ["-d", "TV", "stop"])
+        XCTAssertEqual(r.calls[2], ["-d", "TV", "stop"])
     }
 }

@@ -52,18 +52,46 @@ public enum CattParser {
         }
     }
 
-    public static func parseError(_ output: String) -> String? {
-        if output.contains("RequestTimeout") || output.contains("timed out") {
+    /// Line-aware over a finished run: a media title containing "timed out"
+    /// must never register as an error, so timeout markers count only on
+    /// non-Title lines (tracebacks, pychromecast noise) and on stderr.
+    public static func parseError(stdout: String, stderr: String = "",
+                                  exitCode: Int32 = 0) -> String? {
+        let stdoutLines = lines(stdout)
+        let stderrLines = lines(stderr)
+
+        // catt prints its own "Error: ..." messages to stdout and still exits
+        // 0, so these are checked regardless of status.
+        for l in stdoutLines + stderrLines {
+            if let v = value(after: "Error:", in: l), !v.isEmpty { return v }
+        }
+
+        let timeoutMarkers = ["RequestTimeout", "timed out"]
+        let diagnostic = stdoutLines.filter { !$0.hasPrefix("Title:") } + stderrLines
+        if diagnostic.contains(where: { l in timeoutMarkers.contains(where: l.contains) }) {
             return "The TV did not respond. Make sure it is awake, then try again."
         }
-        for line in output.split(separator: "\n") {
-            let l = line.trimmingCharacters(in: .whitespaces)
-            if let v = value(after: "Error:", in: l) { return v }
+
+        // A failed run with no recognizable message still must not pass as
+        // success; the last stderr line is the most specific thing available.
+        if exitCode != 0 {
+            return stderrLines.last ?? "catt failed (exit \(exitCode))"
         }
         return nil
     }
 
+    /// Merged-output convenience for callers without a structured result.
+    public static func parseError(_ output: String) -> String? {
+        parseError(stdout: output)
+    }
+
     // MARK: - helpers
+
+    private static func lines(_ text: String) -> [String] {
+        text.split(separator: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
 
     private static func value(after prefix: String, in line: String) -> String? {
         guard line.hasPrefix(prefix) else { return nil }

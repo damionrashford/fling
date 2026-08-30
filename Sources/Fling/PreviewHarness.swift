@@ -44,7 +44,6 @@ enum PreviewHarness {
             $0.applyTVRemote(paired: true, isOn: true, currentApp: nil)
         }
         let ambiguous = makeState {
-            $0.sourceChoice = .ambiguous([.chrome, .safari])
             $0.apply(tab: TabRef(url: "https://www.youtube.com/watch?v=gCcx85zbxz4",
                                  title: "Blade Runner 2049 — Official Trailer",
                                  browser: .chrome),

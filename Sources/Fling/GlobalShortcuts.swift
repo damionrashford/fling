@@ -14,8 +14,7 @@ final class GlobalShortcuts {
                   event.charactersIgnoringModifiers?.lowercased() == "c"
             else { return }
             Task { @MainActor in
-                await state.refresh()
-                await state.castCurrentTab()
+                await state.castFrontmostTab()
             }
         }
     }

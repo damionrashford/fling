@@ -52,7 +52,13 @@ final class StatusItemController: NSObject {
             Task { @MainActor in
                 guard let self else { return }
                 guard self.popover.isShown || self.state.panel == .casting else { return }
-                await self.state.refresh()
+                // Closed-popover ticks only feed the menu-bar clock; a full
+                // refresh would spawn browser reads nothing displays.
+                if self.popover.isShown {
+                    await self.state.refresh()
+                } else {
+                    await self.state.refreshStatus()
+                }
             }
         }
     }

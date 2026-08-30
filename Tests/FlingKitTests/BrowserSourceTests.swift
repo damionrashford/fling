@@ -1,6 +1,14 @@
 import XCTest
 @testable import FlingKit
 
+/// Shared fake for the NSWorkspace seam.
+struct FakeApps: RunningAppsReading {
+    var running: Set<String> = []
+    var frontmost: String?
+    func isRunning(bundleID: String) -> Bool { running.contains(bundleID) }
+    func frontmostBundleID() -> String? { frontmost }
+}
+
 final class BrowserSourceTests: XCTestCase {
 
     func test_chrome_snippet_uses_activeTab_and_title() {
@@ -40,11 +48,32 @@ final class BrowserSourceTests: XCTestCase {
         }
     }
 
+    // osascript reports denial on stderr and exits non-zero.
     func test_readTab_with_permission_denial_throws_typed_error() {
         let r = FakeRunner()
-        r.stubbedOutput = "execution error: Not authorized to send Apple events to Safari. (-1743)"
+        r.stubbedStderr = "execution error: Not authorized to send Apple events to Safari. (-1743)"
+        r.stubbedExitCode = 1
         XCTAssertThrowsError(try BrowserReader(runner: r).readTab(.safari)) { error in
             XCTAssertEqual(error as? BrowserError, .permissionDenied(.safari))
+        }
+    }
+
+    // A page *about* the automation error must not trip the permission sniff:
+    // only stderr of a failed run counts.
+    func test_readTab_ignores_permission_text_inside_page_content() throws {
+        let r = FakeRunner()
+        r.stubbedOutput = #"{"url":"https://apple.stackexchange.com/q/1","title":"Fix: Not authorized to send Apple events (-1743)"}"#
+        let tab = try BrowserReader(runner: r).readTab(.safari)
+        XCTAssertEqual(tab.title, "Fix: Not authorized to send Apple events (-1743)")
+    }
+
+    func test_readTab_failed_run_without_denial_is_unreadable() {
+        let r = FakeRunner()
+        r.stubbedStderr = "execution error: some other failure (12)"
+        r.stubbedExitCode = 1
+        XCTAssertThrowsError(try BrowserReader(runner: r).readTab(.chrome)) { error in
+            XCTAssertEqual(error as? BrowserError,
+                           .unreadable(.chrome, "execution error: some other failure (12)"))
         }
     }
 
@@ -55,15 +84,38 @@ final class BrowserSourceTests: XCTestCase {
         XCTAssertFalse(tab.kind.isCastable)
     }
 
-    func test_isRunning_true_when_system_events_reports_a_process() {
-        let r = FakeRunner()
-        r.stubbedOutput = "true"
-        XCTAssertTrue(BrowserReader(runner: r).isRunning(.chrome))
+    // MARK: - NSWorkspace-backed liveness (no subprocess spawns)
+
+    func test_isRunning_true_when_workspace_lists_the_bundle_id() {
+        let apps = FakeApps(running: ["com.google.Chrome"])
+        XCTAssertTrue(BrowserReader(runner: FakeRunner(), apps: apps).isRunning(.chrome))
     }
 
-    func test_isRunning_false_when_system_events_reports_none() {
+    func test_isRunning_false_when_workspace_does_not_list_it() {
+        let apps = FakeApps(running: ["com.apple.Safari"])
+        XCTAssertFalse(BrowserReader(runner: FakeRunner(), apps: apps).isRunning(.chrome))
+    }
+
+    func test_isRunning_and_frontmostApp_spawn_no_subprocess() {
         let r = FakeRunner()
-        r.stubbedOutput = "false"
-        XCTAssertFalse(BrowserReader(runner: r).isRunning(.chrome))
+        let reader = BrowserReader(runner: r, apps: FakeApps(running: ["com.google.Chrome"],
+                                                             frontmost: "com.google.Chrome"))
+        _ = reader.isRunning(.chrome)
+        _ = reader.isRunning(.safari)
+        _ = reader.frontmostApp()
+        XCTAssertTrue(r.calls.isEmpty)
+    }
+
+    /// The resolver matches on process names, so the bundle id maps back to one.
+    func test_frontmostApp_maps_browser_bundle_id_to_process_name() {
+        let apps = FakeApps(frontmost: "com.apple.Safari")
+        XCTAssertEqual(BrowserReader(runner: FakeRunner(), apps: apps).frontmostApp(), "Safari")
+    }
+
+    // A non-browser frontmost app never matches anything in the resolver, so
+    // nil preserves the old semantics.
+    func test_frontmostApp_is_nil_for_non_browser_app() {
+        let apps = FakeApps(frontmost: "com.apple.dt.Xcode")
+        XCTAssertNil(BrowserReader(runner: FakeRunner(), apps: apps).frontmostApp())
     }
 }
