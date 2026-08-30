@@ -26,15 +26,15 @@ public extension TVApp {
               package: "com.google.android.youtube.tv"),
         TVApp(name: "Netflix", link: "netflix://",
               package: "com.netflix.ninja"),
-        TVApp(name: "Prime Video", link: "com.amazon.amazonvideo.livingroom",
+        TVApp(name: "Prime Video", link: "https://app.primevideo.com",
               package: "com.amazon.amazonvideo.livingroom"),
-        TVApp(name: "Disney+", link: "com.disney.disneyplus",
+        TVApp(name: "Disney+", link: "https://www.disneyplus.com",
               package: "com.disney.disneyplus"),
         TVApp(name: "Spotify", link: "spotify://",
               package: "com.spotify.tv.android"),
         TVApp(name: "Plex", link: "plex://",
               package: "com.plexapp.android"),
-        TVApp(name: "Tubi", link: "com.tubitv",
+        TVApp(name: "Tubi", link: "https://tubitv.com/",
               package: "com.tubitv"),
     ]
 

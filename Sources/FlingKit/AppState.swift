@@ -127,7 +127,9 @@ public final class AppState: ObservableObject {
         let browsers = self.browsers
         let prober = self.prober
         let lastUsed = self.lastUsedBrowser
-        let knownDevice = self.selectedDevice?.name
+        // catt takes an IP directly and skips mDNS discovery; targeting by
+        // name re-resolves every call and intermittently misses.
+        let knownDevice = self.selectedDevice?.ip
         let needsScan = self.devices.isEmpty
 
         let result = await Task.detached(priority: .userInitiated) { () -> RefreshResult in
@@ -141,8 +143,8 @@ public final class AppState: ObservableObject {
             if case .single(let browser) = choice { newTab = try? browsers.readTab(browser) }
             let (media, hint) = Self.probe(newTab, with: prober)
 
-            let deviceName = knownDevice ?? found?.first?.name
-            let status = deviceName.flatMap { try? catt.status(device: $0) } ?? .empty
+            let target = knownDevice ?? found?.first?.ip
+            let status = target.flatMap { try? catt.status(device: $0) } ?? .empty
 
             return RefreshResult(devices: found, choice: choice, tab: newTab,
                                  status: status, media: media, probeHint: hint)
@@ -202,6 +204,7 @@ public final class AppState: ObservableObject {
 
     public func select(device: DeviceInfo) async {
         selectedDevice = device
+        lastError = nil
         refreshTVPaired()
         await refresh()
     }
@@ -434,7 +437,7 @@ public final class AppState: ObservableObject {
     /// outcome back on it.
     private func send(_ body: @escaping @Sendable (CattClient, String) throws -> Void) async {
         guard let catt else { lastError = "catt is not installed"; return }
-        guard let device = selectedDevice?.name else { lastError = "No device selected"; return }
+        guard let device = selectedDevice?.ip else { lastError = "No device selected"; return }
 
         let failure = await Task.detached(priority: .userInitiated) { () -> String? in
             do { try body(catt, device); return nil }
