@@ -16,7 +16,7 @@ public struct ScrollNav {
 
     private var accX: CGFloat = 0
     private var accY: CGFloat = 0
-    private var lastEmit: TimeInterval = 0
+    private var lastEmit: TimeInterval = -.infinity
 
     public init() {}
 
@@ -36,7 +36,7 @@ public struct ScrollNav {
 
         var keys: [Int32] = []
         while max(abs(accX), abs(accY)) >= Self.step, keys.count < 2 {
-            guard now - lastEmit >= Self.minInterval || keys.isEmpty else { break }
+            guard now - lastEmit >= Self.minInterval else { break }
             if abs(accX) > abs(accY) {
                 keys.append(accX > 0 ? ATVKeyCode.dpadLeft : ATVKeyCode.dpadRight)
                 accX -= Self.step * (accX > 0 ? 1 : -1)
